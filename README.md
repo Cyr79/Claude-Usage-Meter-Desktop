@@ -4,7 +4,8 @@ Claude.ai usage in the macOS menu bar and the Windows system tray.
 
 ```
 macOS     S: 42%  W: 18%  F: 7%      (text in the menu bar)
-Windows   ◕ coloured tray icon  (numbers in the tooltip + menu)
+Windows   ◕ numbered tray badges  (hover for the meter names)
+
 ```
 
 ## Run it
@@ -72,10 +73,10 @@ only.
 
 macOS lets an app draw text in the menu bar, so you get `S: 42%  W: 18%`.
 
-Windows tray entries are a 16×16 image plus a tooltip. There is no text API. So
-Windows gets a ring icon that fills and changes colour (blue → amber → red),
-with the numbers in the tooltip and the right-click menu. Rendering digits into
-16×16 was tried and is unreadable.
+Windows tray entries are a small image plus a tooltip. There is no text API, so
+each selected meter gets its own icon with the percentage drawn in it. Hover to
+see the meter name and reset time. The taskbar can show one badge or one per
+meter from Display → Taskbar badges.
 
 That difference is the OS, not the framework. Electron, Tauri and native code
 all hit it.

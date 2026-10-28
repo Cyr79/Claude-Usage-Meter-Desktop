@@ -21,6 +21,7 @@ const DEFAULTS = {
   forecastWindowMinutes: 120,
   orgUuid: null,
   startAtLogin: true,
+  windowsTrayMode: 'per-meter',
   firstRunDone: false,
   settingsVersion: SETTINGS_VERSION,
 };

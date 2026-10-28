@@ -10,7 +10,8 @@ const { Store } = require('./store');
 const { Fetcher, AuthError, ORIGIN } = require('./fetcher');
 const { extractMeters, LABELS, CANONICAL_ORDER } = require('./parse');
 const { History, forecast, untilReset } = require('./forecast');
-const { macTitle, tooltip, iconState, STYLE_PREVIEWS } = require('./format');
+const { macTitle, tooltip, iconState, severity, chosenMeters, STYLE_PREVIEWS } = require('./format');
+const { renderBadge } = require('./trayicon');
 
 const IS_MAC = process.platform === 'darwin';
 const STALE_AFTER = 15 * 60 * 1000;
@@ -19,10 +20,11 @@ const ASSETS = path.join(__dirname, '..', '..', 'assets', 'tray');
 // Only one instance may own the tray icon, or the user gets duplicates.
 if (!app.requestSingleInstanceLock()) app.quit();
 
-// macOS: no Dock icon. Windows/Linux have no equivalent — the tray is enough.
+// macOS: no Dock icon. Windows shows numbered usage badges in the taskbar.
 if (IS_MAC && app.dock) app.dock.hide();
 
 let tray = null;
+const meterTrays = new Map();
 let store = null;
 let fetcher = null;
 let pollTimer = null;
@@ -188,6 +190,26 @@ function buildMenu() {
     });
     display.push({ type: 'separator' });
   }
+  if (process.platform === 'win32') {
+    display.push({
+      label: 'Taskbar badges',
+      submenu: [
+        {
+          label: 'One badge per meter',
+          type: 'radio',
+          checked: store.get('windowsTrayMode') !== 'single',
+          click: () => { store.set('windowsTrayMode', 'per-meter'); destroyMeterTrays(); render(); },
+        },
+        {
+          label: 'Single badge (closest to limit)',
+          type: 'radio',
+          checked: store.get('windowsTrayMode') === 'single',
+          click: () => { store.set('windowsTrayMode', 'single'); destroyMeterTrays(); render(); },
+        },
+      ],
+    });
+    display.push({ type: 'separator' });
+  }
   for (const key of CANONICAL_ORDER) {
     display.push({
       label: `Show ${LABELS[key]}`,
@@ -223,6 +245,10 @@ function render() {
     tray.setTitle(state.needsLogin ? 'Claude — sign in' : macTitle(state.meters, store));
   }
   tray.setImage(trayImage(iconState(state.meters, store, stale)));
+  if (process.platform === 'win32') {
+    if (state.meters.length && !state.needsLogin) renderWindowsTrays(stale);
+    else destroyMeterTrays();
+  }
   tray.setToolTip(
     state.needsLogin
       ? 'Claude Usage Meter — click to sign in'
@@ -251,6 +277,52 @@ function setLoginItem(enabled) {
     // Windows: start minimised to tray rather than flashing a window.
     args: IS_MAC ? [] : ['--hidden'],
   });
+}
+
+function chosenForTray() {
+  const selected = chosenMeters(state.meters, store);
+  if (store.get('windowsTrayMode') === 'single') {
+    return selected.length
+      ? [selected.reduce((a, b) => (b.pct > a.pct ? b : a))]
+      : [];
+  }
+  return selected;
+}
+
+function renderWindowsTrays(stale) {
+  const selected = chosenForTray();
+  const wanted = new Set(selected.map((meter) => meter.key));
+
+  for (const [key, meterTray] of meterTrays) {
+    if (!wanted.has(key)) {
+      meterTray.destroy();
+      meterTrays.delete(key);
+    }
+  }
+
+  for (const meter of selected) {
+    const role = stale
+      ? 'stale'
+      : severity(meter.pct, store.get('warnAt'), store.get('dangerAt'));
+    const { buffer, width, height } = renderBadge(meter.pct, role, 32);
+    const image = nativeImage.createFromBitmap(buffer, { width, height, scaleFactor: 2 });
+    let meterTray = meterTrays.get(meter.key);
+    if (!meterTray) {
+      meterTray = new Tray(image);
+      meterTray.on('click', () => meterTray.popUpContextMenu());
+      meterTrays.set(meter.key, meterTray);
+    } else {
+      meterTray.setImage(image);
+    }
+    meterTray.setToolTip(`${meter.label} — ${Math.round(meter.pct)}%`
+      + (meter.resetsAt ? `, resets ${untilReset(meter.resetsAt)}` : ''));
+    meterTray.setContextMenu(buildMenu());
+  }
+}
+
+function destroyMeterTrays() {
+  for (const meterTray of meterTrays.values()) meterTray.destroy();
+  meterTrays.clear();
 }
 
 function signIn() {
@@ -290,7 +362,7 @@ function firstRun() {
       + 'meter runs in the background and you will not see it again.\n\n'
       + (IS_MAC
         ? 'Your usage appears in the menu bar.'
-        : 'Your usage appears in the system tray — hover the icon for the numbers.'),
+        : 'Your usage percentages appear in the system tray. Hover a badge for its meter name and reset time.'),
     buttons: ['Sign in'],
   }).then(signIn);
 }
@@ -322,4 +394,4 @@ app.whenReady().then(() => {
 app.on('second-instance', () => tray && tray.popUpContextMenu());
 // The tray app has no windows by design; closing them must not quit it.
 app.on('window-all-closed', (e) => e.preventDefault());
-app.on('before-quit', () => fetcher && fetcher.destroy());
+app.on('before-quit', () => { destroyMeterTrays(); if (fetcher) fetcher.destroy(); });
