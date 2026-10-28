@@ -101,4 +101,16 @@ function untilReset(resetsAt, now = Date.now() / 1000) {
   return `in ${formatDuration(resetsAt - now)}`;
 }
 
-module.exports = { History, forecast, untilReset, formatDuration };
+function resetDateTime(resetsAt) {
+  if (!resetsAt) return 'unknown';
+  return new Date(resetsAt * 1000).toLocaleString(undefined, {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+module.exports = { History, forecast, untilReset, resetDateTime, formatDuration };

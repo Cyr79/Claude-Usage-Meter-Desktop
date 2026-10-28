@@ -9,7 +9,7 @@ const { autoUpdater } = require('electron-updater');
 const { Store } = require('./store');
 const { Fetcher, AuthError, ORIGIN } = require('./fetcher');
 const { extractMeters, LABELS, CANONICAL_ORDER } = require('./parse');
-const { History, forecast, untilReset } = require('./forecast');
+const { History, forecast, untilReset, resetDateTime } = require('./forecast');
 const { macTitle, tooltip, iconState, severity, chosenMeters, STYLE_PREVIEWS } = require('./format');
 const { renderBadge } = require('./trayicon');
 
@@ -120,11 +120,15 @@ function schedulePolling() {
 
 function meterSubmenu(meter) {
   const history = state.histories.get(meter.key) || new History();
+  const weekly = meter.key === 'weekly' || meter.key === 'weekly_opus';
   const items = [
-    { label: `Resets ${untilReset(meter.resetsAt)}`, enabled: false },
+    {
+      label: `Resets ${weekly ? resetDateTime(meter.resetsAt) : untilReset(meter.resetsAt)}`,
+      enabled: false,
+    },
     { label: forecast(meter.pct, history, meter.resetsAt), enabled: false },
   ];
-  if (meter.resetsAt) {
+  if (meter.resetsAt && !weekly) {
     items.push({
       label: new Date(meter.resetsAt * 1000).toLocaleString(),
       enabled: false,
@@ -314,8 +318,11 @@ function renderWindowsTrays(stale) {
     } else {
       meterTray.setImage(image);
     }
+    const resetText = meter.key === 'weekly' || meter.key === 'weekly_opus'
+      ? resetDateTime(meter.resetsAt)
+      : untilReset(meter.resetsAt);
     meterTray.setToolTip(`${meter.label} — ${Math.round(meter.pct)}%`
-      + (meter.resetsAt ? `, resets ${untilReset(meter.resetsAt)}` : ''));
+      + (meter.resetsAt ? `, resets ${resetText}` : ''));
     meterTray.setContextMenu(buildMenu());
   }
 }
