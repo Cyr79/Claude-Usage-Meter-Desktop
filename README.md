@@ -148,6 +148,7 @@ the number drawn into it, and the details live in the tooltip and the gauge.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.2.2** — Midnight resets shown as 23:59 of the last day, with the day name.
 - **1.2.1** — Lighter: usage is read straight from the API (no hidden claude.ai page; window only for sign-in or as fallback), closed gauge is freed.
 - **1.2.0** — 📌 Pin the energy gauge: always on top, draggable, remembered position.
 - **1.1.1** — "Left 10% · 5h 16m" replaces the confusing %/day figure when less than a day remains.

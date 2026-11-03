@@ -103,7 +103,11 @@ function untilReset(resetsAt, now = Date.now() / 1000) {
 
 function resetDateTime(resetsAt, short = false) {
   if (!resetsAt) return 'unknown';
-  return new Date(resetsAt * 1000).toLocaleString(undefined, {
+  // A reset at midnight is shown as 23:59 of the day before ("tis 3 nov 23:59"),
+  // so the date is the last day you can still use, not the next morning.
+  const d = new Date(Math.round(resetsAt / 60) * 60000);
+  if (d.getHours() === 0 && d.getMinutes() === 0) d.setMinutes(-1);
+  return d.toLocaleString(undefined, {
     weekday: 'short',
     ...(short ? {} : { year: 'numeric' }),
     month: 'short',
