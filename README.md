@@ -1,40 +1,102 @@
 # Claude Usage Meter — Desktop
 
-Claude.ai usage in the macOS menu bar and the Windows system tray.
+Your Claude.ai usage limits in the Windows system tray (and the macOS menu bar),
+with a daily pace check and a live context meter for Claude Code.
 
 ```
-macOS     S: 42%  W: 18%  F: 7%      (text in the menu bar)
-Windows   ◕ numbered tray badges  (hover for the meter names)
-
+Windows   numbered tray badges · hover for pace · click for the energy gauge
+macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 ```
 
-## Run it
+<img src="docs/energy-gauge.png" width="360" alt="Energy gauge popup">
+
+<sub>Screenshot with sample data.</sub>
+
+## Features
+
+### Usage badges
+One badge per limit (Session 5h, Weekly, Weekly Opus, Fable) showing the
+percentage used. Colour = state: normal, amber from 80%, red from 95%, grey
+when the reading is stale. Display → *Taskbar badges* switches to a single badge
+for the meter closest to its limit.
+
+### ⚡ Energy gauge (new in 1.1)
+**Left-click** any badge for a popup with one bar per meter. Bars fill
+green → amber → red and pulse near the limit. The **white tick** is where you
+*should* be if usage were spread evenly over the window: bar past the tick =
+ahead of pace. **Right-click** opens the menu.
+
+### 📅 Daily pace (new in 1.1)
+A weekly limit allows **100% / 7 days = 14.3% per day**. Hover the Weekly badge:
+
+```
+Weekly — 90%, resets ons 4 nov. 00:00
+🟢 Avg 13.3%/d · target 14.3
+🟢 Today +1.0% (max 11.0)
+Left 10.0% · 5h 16m
+```
+
+| Line | Meaning |
+|---|---|
+| **Avg** | average use per day since the week started, vs the 14.3%/day target |
+| **Today** | used since midnight, vs the most you can spend today and still last until the reset |
+| **Left** | what remains and the time until reset; with more than a day left it adds the %/day you can afford, e.g. `(17.1%/d)` |
+
+🟢 on pace · 🔴 over. The badge itself turns **red** when you are over pace or
+over today's allowance (Display → *Red badge when over daily pace*). The 5-hour
+Session meter uses the same model per hour (100% / 5h = 20%/h).
+
+"Today" starts at the first reading of the day, so on the day you install it
+only counts from that moment.
+
+### 🧠 Claude Code context window (new in 1.1)
+A teal badge shows how full the context window of your **active Claude
+Code session** is: tokens in context / 200k (1M once a session goes past 200k).
+It reads the transcripts Claude Code saves in `~/.claude/projects` every 5 s and
+moves after each reply; `/compact` or `/clear` bring it back down. It hides after
+30 min without activity; the gauge keeps the last value marked *idle*.
+
+| Works | Doesn't work |
+|---|---|
+| Claude Code on this PC: terminal, VS Code / JetBrains, desktop app Code tab | claude.ai and Claude Desktop chats (no context size is exposed anywhere) |
+| | Claude Code sessions running in the cloud |
+
+Display → *Claude Code context gauge* toggles it; *Context window size* forces
+200k or 1M.
+
+## Install
+
+1. Download `Claude Usage Meter Setup x.y.z.exe` from
+   [Releases](https://github.com/Cyr79/Claude-Usage-Meter-Desktop/releases).
+2. Quit the running meter (right-click a badge → Quit).
+3. Run the installer. The build is unsigned, so SmartScreen may warn:
+   *More info → Run anyway*. Settings and sign-in are kept.
+4. Sign in once when the window opens. It then hides and polls in the background.
+
+Badges hidden? Click the **^** arrow next to the clock and drag them onto the taskbar.
+
+## Run from source
 
 ```bash
 npm install
 npm start
 ```
 
-Sign in when the window opens. It hides itself and polls from then on.
-
 ## Build
 
 ```bash
-npm test          # 12 tests over the parse + forecast logic
+npm test          # 20 tests: parse, forecast, pace, context
+npm run dist:win  # NSIS installer
 npm run dist:mac  # DMG (arm64 + x64)
-npm run dist:win  # NSIS installer (x64 + arm64)
 ```
 
-Tag a release and GitHub Actions builds both on their native runners:
+On Windows without Developer Mode, electron-builder can fail extracting
+`winCodeSign` ("Cannot create symbolic link"). Extract the downloaded `.7z` in
+`%LOCALAPPDATA%\electron-builder\Cache\winCodeSign` into a `winCodeSign-2.6.0`
+folder once (the two macOS symlink errors are harmless) and rebuild.
 
-```bash
-git tag v1.0.0 && git push --tags
-```
-
-## Signing secrets
-
-Set these in the repo's Settings → Secrets → Actions. All optional — unset just
-means unsigned builds with OS warnings.
+### Signing secrets
+Optional — unset means unsigned builds with OS warnings.
 
 | Secret | Purpose |
 |---|---|
@@ -42,77 +104,45 @@ means unsigned builds with OS warnings.
 | `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` | Notarization |
 | `WIN_CERT_PFX`, `WIN_CERT_PASSWORD` | Windows code signing |
 
-Notarization is not the Mac App Store — no review, no listing, no 30% cut. Just
-an automated scan that takes a few minutes.
-
-## Icons
-
-All tray icons are committed in `assets/tray/`, generated from `assets/logo.svg`.
-After changing the logo:
-
-```bash
-npm install --save-dev sharp
-npm run icons
-```
-
-The tray glyph is the **gauge and needle only** — the sun disc and Claude burst
-are dropped. In a macOS template image the white burst has to be knocked out of
-the coral disc, which leaves a sliver that vanishes below about 48px; at 16 and
-32 it added nothing but mud. The full logo with disc and burst is still used for
-the app icon (`build/icon.png` → Dock, installer, taskbar).
-
-Windows recolours the gauge itself — coral, amber, red, grey — rather than
-adding a status badge, because a badge big enough to see at 16px covers the
-logo completely.
-
-The macOS menu bar shows the gauge glyph before the numbers by default. Turn it
-off with Display → Show logo in menu bar, or `"macTrayIcon": "none"` for text
-only.
-
-## Why the platforms differ
-
-macOS lets an app draw text in the menu bar, so you get `S: 42%  W: 18%`.
-
-Windows tray entries are a small image plus a tooltip. There is no text API, so
-each selected meter gets its own icon with the percentage drawn in it. Hover to
-see the meter name and reset time. The taskbar can show one badge or one per
-meter from Display → Taskbar badges.
-
-That difference is the OS, not the framework. Electron, Tauri and native code
-all hit it.
-
 ## Architecture
 
 ```
-src/main/index.js    tray, menu, polling loop, auto-launch
-src/main/fetcher.js  hidden BrowserWindow holding the session
-src/main/parse.js    tolerant tree-walk over the /usage payload
-src/main/forecast.js reset detection + burn-rate regression
-src/main/format.js   mac title text / windows icon state + tooltip
-src/main/store.js    JSON config in userData
+src/main/index.js     tray, menu, polling, energy gauge window, auto-launch
+src/main/fetcher.js   hidden BrowserWindow holding the claude.ai session
+src/main/parse.js     tolerant tree-walk over the /usage payload
+src/main/forecast.js  reset detection + burn-rate regression
+src/main/pace.js      daily pace vs 100%/window, today's allowance
+src/main/context.js   Claude Code context fill from ~/.claude/projects
+src/main/format.js    mac title text / windows icon state + tooltip
+src/main/trayicon.js  badge bitmaps drawn by hand (no canvas, no native deps)
+src/main/store.js     JSON config in userData
+src/renderer/         energy gauge popup (gauge.html + preload)
 ```
 
-No Playwright. Electron already ships Chromium, so a hidden `BrowserWindow` with
-a `persist:claude` partition is the browser — and the fetch runs inside the page,
-so cookies, headers and origin are all real.
+No Playwright: Electron already ships Chromium, so a hidden `BrowserWindow`
+with a `persist:claude` partition is the browser, and the fetch runs inside the
+page with real cookies, headers and origin.
 
-## Carried over from the extension
+### Why Windows and macOS differ
+macOS lets an app draw text in the menu bar. A Windows tray entry is a 16 px
+image plus a tooltip (max 127 characters), so each meter gets its own badge with
+the number drawn into it, and the details live in the tooltip and the gauge.
 
-- **The pickPct rule.** REST `utilization` is 0..100; `utilization: 1` means one
-  percent. SSE `message_limit` values are 0..1 fractions. `parse.js` never
-  rescales, and a test asserts `1 → 1%`.
-- **Reset detection by discontinuity.** `resets_at` creeps forward seconds on
-  every poll, so a reset is only a ≥30min jump or a collapse to ≤40%.
-- **UA hygiene.** Electron's default UA contains `Electron/x.y.z`, which trips
-  the bot filter and returns 403 on `/api/*` even with a valid cookie. It is
-  stripped in `fetcher.js`.
-- **Auth state is not sticky.** Only a real 401/403 sets "signed out"; transient
-  failures show an error instead.
+### Details worth knowing
+- **pickPct rule.** REST `utilization` is 0..100 (`1` means 1%); SSE
+  `message_limit` values are 0..1. `parse.js` never rescales.
+- **Reset detection.** `resets_at` creeps forward a few seconds every poll, so a
+  reset is only a ≥30 min jump or a drop to ≤40%.
+- **User-Agent.** Electron's default UA trips the bot filter (403 on `/api/*`);
+  `fetcher.js` strips it.
+- **Auth state.** Only a real 401/403 means "signed out"; other failures show an error.
 
 ## Known limits
+- **Free plans don't work:** `/usage` returns nothing for unmetered accounts.
+- **Context meter is Claude Code only** (see above).
+- **~150 MB installed** — that's Chromium.
 
-- **Free plans don't work.** `/usage` returns null for unmetered accounts. The
-  extension reads the SSE `message_limit` event instead, but that only fires
-  when *you* send a message in *your* tab — a background window never sees it.
-- **~150MB installed.** That's Chromium. It's also what removes the separate
-  browser dependency.
+## Changelog
+- **1.1.1** — "Left 10% · 5h 16m" replaces the confusing %/day figure when less than a day remains.
+- **1.1.0** — Energy gauge popup, daily pace vs 100%/7 with red badges, Claude Code context meter.
+- **1.0.3** — Weekly reset shown as date and time; larger Windows badges.
