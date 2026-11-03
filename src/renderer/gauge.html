@@ -76,7 +76,8 @@
           + (p.todaySince ? ` <span class="sub">since ${new Date(p.todaySince * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` : '') + '</div>';
       }
       if (p.budget !== null) {
-        html += `<div class="pace sub">Budget left: ${f1(p.budget)}%/${u} for ${f1(p.leftUnits)} ${u === 'day' ? 'days' : 'h'}</div>`;
+        const rate = u === 'day' && p.leftUnits >= 1 ? ` (~${f1(p.budget)}%/day)` : '';
+        html += `<div class="pace sub">Left ${f1(p.leftPct)}% for ${esc(p.leftText)}${rate}</div>`;
       }
     }
     return html + '</div>';

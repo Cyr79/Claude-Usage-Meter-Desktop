@@ -77,6 +77,8 @@ function pace(meter, baseline, now = Date.now() / 1000) {
     avg,
     budget,
     leftUnits,
+    leftPct: 100 - meter.pct,
+    leftText: dur(left),
     delta: meter.pct - expected,
     overPace,
     today,
@@ -85,6 +87,20 @@ function pace(meter, baseline, now = Date.now() / 1000) {
     allowance,
     hot: overPace || todayOver,
   };
+}
+
+function dur(sec) {
+  const m = Math.max(0, Math.round(sec / 60));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d) return `${d}d ${h}h`;
+  return h ? `${h}h ${m % 60}m` : `${m % 60}m`;
+}
+
+/** "Left 11% for 6h 51m", plus a per-day rate only when >1 day remains. */
+function leftLine(p) {
+  const rate = p.unit === 'day' && p.leftUnits >= 1 ? ` (~${f1(p.budget)}%/day)` : '';
+  return `Left ${f1(p.leftPct)}% for ${p.leftText}${rate}`;
 }
 
 const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
@@ -101,7 +117,7 @@ function paceLines(p) {
     lines.push(`${p.todayOver ? '🔴' : '🟢'} Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% (100/7 = ${f1(p.target)}%)`);
   }
   if (p.budget !== null) {
-    lines.push(`Budget left: ${f1(p.budget)}%/${u} for ${f1(p.leftUnits)} ${u === 'day' ? 'days' : 'h'}`);
+    lines.push(leftLine(p));
   }
   return lines;
 }
@@ -112,8 +128,11 @@ function tipLines(p) {
   const u = p.unit === 'day' ? 'd' : 'h';
   const lines = [`${p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} · target ${f1(p.target)}`];
   if (p.today !== null) lines.push(`${p.todayOver ? '🔴' : '🟢'} Today +${f1(p.today)}% (max ${f1(p.allowance)})`);
-  if (p.budget !== null) lines.push(`Can use ${f1(p.budget)}%/${u} till reset`);
+  if (p.budget !== null) {
+    const rate = p.unit === 'day' && p.leftUnits >= 1 ? ` (${f1(p.budget)}%/d)` : '';
+    lines.push(`Left ${f1(p.leftPct)}% · ${p.leftText}${rate}`);
+  }
   return lines;
 }
 
-module.exports = { pace, paceLines, tipLines, updateBaseline, localDay, WINDOWS };
+module.exports = { leftLine, pace, paceLines, tipLines, updateBaseline, localDay, WINDOWS };
