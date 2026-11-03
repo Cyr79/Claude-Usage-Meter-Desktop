@@ -23,6 +23,14 @@ const DEFAULTS = {
   startAtLogin: true,
   windowsTrayMode: 'per-meter',
   firstRunDone: false,
+  // Badge turns red when usage runs ahead of 100%/window (e.g. 14.3%/day).
+  paceColours: true,
+  dayBaselines: {},
+  // Live context fill of the active Claude Code session (~/.claude/projects).
+  showContext: true,
+  contextBadge: true,
+  contextLimit: 'auto',
+  gaugePinned: false,
   settingsVersion: SETTINGS_VERSION,
 };
 

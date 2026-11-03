@@ -3,6 +3,7 @@
 const path = require('path');
 const {
   app, Tray, Menu, nativeImage, shell, dialog, clipboard, Notification,
+  BrowserWindow, ipcMain, screen,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
@@ -12,6 +13,8 @@ const { extractMeters, LABELS, CANONICAL_ORDER } = require('./parse');
 const { History, forecast, untilReset, resetDateTime } = require('./forecast');
 const { macTitle, tooltip, iconState, severity, chosenMeters, STYLE_PREVIEWS } = require('./format');
 const { renderBadge } = require('./trayicon');
+const { pace, paceLines, tipLines, updateBaseline } = require('./pace');
+const { readContext } = require('./context');
 
 const IS_MAC = process.platform === 'darwin';
 const STALE_AFTER = 15 * 60 * 1000;
@@ -28,6 +31,10 @@ const meterTrays = new Map();
 let store = null;
 let fetcher = null;
 let pollTimer = null;
+let gauge = null;
+let gaugeHiddenAt = 0;
+let contextTray = null;
+let lastContextKey = '';
 
 const state = {
   meters: [],
@@ -35,7 +42,19 @@ const state = {
   lastOkAt: null,
   lastError: null,
   needsLogin: false,
+  context: null,
 };
+
+const isWeekly = (meter) => meter.key === 'weekly' || meter.key === 'weekly_opus' || meter.key === 'fable';
+
+function meterPace(meter) {
+  const baselines = store.get('dayBaselines') || {};
+  return pace(meter, baselines[meter.key]);
+}
+
+function resetText(meter) {
+  return isWeekly(meter) ? resetDateTime(meter.resetsAt) : untilReset(meter.resetsAt);
+}
 
 const isStale = () => !state.lastOkAt || Date.now() - state.lastOkAt > STALE_AFTER;
 
@@ -101,6 +120,10 @@ function applyResult(raw) {
     }
   }
 
+  const baselines = { ...(store.get('dayBaselines') || {}) };
+  for (const meter of meters) updateBaseline(baselines, meter, now);
+  store.set('dayBaselines', baselines);
+
   state.meters = meters;
   state.lastOkAt = Date.now();
   state.needsLogin = false;
@@ -120,13 +143,11 @@ function schedulePolling() {
 
 function meterSubmenu(meter) {
   const history = state.histories.get(meter.key) || new History();
-  const weekly = meter.key === 'weekly' || meter.key === 'weekly_opus';
+  const weekly = isWeekly(meter);
   const items = [
-    {
-      label: `Resets ${weekly ? resetDateTime(meter.resetsAt) : untilReset(meter.resetsAt)}`,
-      enabled: false,
-    },
+    { label: `Resets ${resetText(meter)}`, enabled: false },
     { label: forecast(meter.pct, history, meter.resetsAt), enabled: false },
+    ...paceLines(meterPace(meter)).map((label) => ({ label, enabled: false })),
   ];
   if (meter.resetsAt && !weekly) {
     items.push({
@@ -139,7 +160,7 @@ function meterSubmenu(meter) {
 }
 
 function buildMenu() {
-  const items = [];
+  const items = [{ label: '⚡ Show energy gauge', click: showGauge }, { type: 'separator' }];
 
   if (state.needsLogin) {
     items.push(
@@ -157,6 +178,13 @@ function buildMenu() {
       });
     }
     items.push({ type: 'separator' });
+  }
+  const ctx = state.context;
+  if (store.get('showContext') && ctx && ctx.available) {
+    items.push({
+      label: `Claude Code context   ${Math.round(ctx.pct)}%  (${Math.round(ctx.tokens / 1000)}k/${Math.round(ctx.limit / 1000)}k${ctx.active ? '' : ', idle'})`,
+      enabled: false,
+    }, { type: 'separator' });
   }
 
   items.push({
@@ -214,6 +242,30 @@ function buildMenu() {
     });
     display.push({ type: 'separator' });
   }
+  display.push(
+    {
+      label: 'Red badge when over daily pace',
+      type: 'checkbox',
+      checked: store.get('paceColours') !== false,
+      click: (item) => { store.set('paceColours', item.checked); render(); },
+    },
+    {
+      label: 'Claude Code context gauge',
+      type: 'checkbox',
+      checked: !!store.get('showContext'),
+      click: (item) => { store.set('showContext', item.checked); pollContext(true); },
+    },
+    {
+      label: 'Context window size',
+      submenu: [['auto', 'Auto (200k, 1M if larger)'], [200000, '200k'], [1000000, '1M']].map(([v, label]) => ({
+        label,
+        type: 'radio',
+        checked: String(store.get('contextLimit')) === String(v),
+        click: () => { store.set('contextLimit', v); pollContext(true); },
+      })),
+    },
+    { type: 'separator' },
+  );
   for (const key of CANONICAL_ORDER) {
     display.push({
       label: `Show ${LABELS[key]}`,
@@ -259,6 +311,135 @@ function render() {
       : tooltip(state.meters, store, stale),
   );
   tray.setContextMenu(buildMenu());
+  if (process.platform === 'win32') renderContextTray();
+  pushGauge();
+}
+
+// ----------------------------------------------------------- energy gauge
+
+function gaugeData() {
+  return {
+    needsLogin: state.needsLogin,
+    error: state.lastError,
+    updated: state.lastOkAt,
+    context: { enabled: !!store.get('showContext'), ...(state.context || {}) },
+    meters: chosenMeters(state.meters, store).map((meter) => ({
+      key: meter.key,
+      label: meter.label,
+      pct: meter.pct,
+      resetText: meter.resetsAt ? resetText(meter) : 'unknown',
+      forecast: forecast(meter.pct, state.histories.get(meter.key) || new History(), meter.resetsAt),
+      pace: meterPace(meter),
+    })),
+  };
+}
+
+function pushGauge() {
+  if (gauge && !gauge.isDestroyed() && gauge.isVisible()) {
+    gauge.webContents.send('gauge:data', gaugeData());
+  }
+}
+
+function createGauge() {
+  gauge = new BrowserWindow({
+    width: 360,
+    height: 420,
+    show: false,
+    frame: false,
+    resizable: false,
+    transparent: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    fullscreenable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'gauge-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  gauge.loadFile(path.join(__dirname, '..', 'renderer', 'gauge.html'));
+  gauge.on('blur', () => { if (!store.get('gaugePinned')) { gaugeHiddenAt = Date.now(); gauge.hide(); } });
+  gauge.webContents.on('did-finish-load', () => { fitGauge(); pushGauge(); });
+}
+
+function fitGauge() {
+  gauge.webContents.executeJavaScript('document.querySelector(".card").getBoundingClientRect().height')
+    .then((h) => {
+      if (!gauge || gauge.isDestroyed()) return;
+      const [w] = gauge.getSize();
+      gauge.setSize(w, Math.min(720, Math.ceil(h) + 2));
+      placeGauge();
+    })
+    .catch(() => {});
+}
+
+function placeGauge() {
+  const bounds = tray ? tray.getBounds() : { x: 0, y: 0, width: 0, height: 0 };
+  const point = bounds.width ? { x: bounds.x, y: bounds.y } : screen.getCursorScreenPoint();
+  const { workArea } = screen.getDisplayNearestPoint(point);
+  const [w, h] = gauge.getSize();
+  let x = Math.round(point.x + (bounds.width || 0) / 2 - w / 2);
+  // Taskbar at the bottom (usual) -> above the icon; at the top -> below it.
+  let y = point.y > workArea.y + workArea.height / 2 ? workArea.y + workArea.height - h - 8 : workArea.y + 8;
+  x = Math.max(workArea.x + 8, Math.min(x, workArea.x + workArea.width - w - 8));
+  y = Math.max(workArea.y, y);
+  gauge.setPosition(x, y);
+}
+
+function showGauge() {
+  if (!gauge || gauge.isDestroyed()) createGauge();
+  placeGauge();
+  gauge.show();
+  gauge.focus();
+  pushGauge();
+  fitGauge();
+}
+
+function toggleGauge() {
+  // A click on the tray blurs the popup first; don't instantly reopen it.
+  if (Date.now() - gaugeHiddenAt < 350) return;
+  if (gauge && !gauge.isDestroyed() && gauge.isVisible()) gauge.hide();
+  else showGauge();
+}
+
+// --------------------------------------------------- Claude Code context
+
+function pollContext(force = false) {
+  if (!store.get('showContext')) {
+    state.context = null;
+    if (contextTray) { contextTray.destroy(); contextTray = null; }
+    if (force) render();
+    return;
+  }
+  const ctx = readContext(store.get('contextLimit'));
+  state.context = ctx;
+  const key = ctx.available ? `${Math.round(ctx.pct)}|${ctx.active}|${ctx.tokens}` : `x|${ctx.reason}`;
+  if (force || key !== lastContextKey) {
+    lastContextKey = key;
+    render();
+  }
+}
+
+function renderContextTray() {
+  const ctx = state.context;
+  const want = store.get('showContext') && store.get('contextBadge') !== false && ctx && ctx.available && ctx.active;
+  if (!want) {
+    if (contextTray) { contextTray.destroy(); contextTray = null; }
+    return;
+  }
+  const role = ctx.pct >= 90 ? 'danger' : ctx.pct >= 70 ? 'warn' : 'context';
+  const { buffer, width, height } = renderBadge(ctx.pct, role, 32);
+  const image = nativeImage.createFromBitmap(buffer, { width, height, scaleFactor: 2 });
+  if (!contextTray) {
+    contextTray = new Tray(image);
+    contextTray.on('click', toggleGauge);
+  } else {
+    contextTray.setImage(image);
+  }
+  contextTray.setToolTip(`Claude Code context — ${Math.round(ctx.pct)}%\n`
+    + `${Math.round(ctx.tokens / 1000)}k / ${Math.round(ctx.limit / 1000)}k tokens`);
+  contextTray.setContextMenu(buildMenu());
 }
 
 // ------------------------------------------------------------- callbacks
@@ -305,26 +486,37 @@ function renderWindowsTrays(stale) {
   }
 
   for (const meter of selected) {
-    const role = stale
+    const p = meterPace(meter);
+    let role = stale
       ? 'stale'
       : severity(meter.pct, store.get('warnAt'), store.get('dangerAt'));
+    if (!stale && p && p.hot && store.get('paceColours') !== false) role = 'danger';
     const { buffer, width, height } = renderBadge(meter.pct, role, 32);
     const image = nativeImage.createFromBitmap(buffer, { width, height, scaleFactor: 2 });
     let meterTray = meterTrays.get(meter.key);
     if (!meterTray) {
       meterTray = new Tray(image);
-      meterTray.on('click', () => meterTray.popUpContextMenu());
+      meterTray.on('click', toggleGauge);
       meterTrays.set(meter.key, meterTray);
     } else {
       meterTray.setImage(image);
     }
-    const resetText = meter.key === 'weekly' || meter.key === 'weekly_opus'
-      ? resetDateTime(meter.resetsAt)
-      : untilReset(meter.resetsAt);
-    meterTray.setToolTip(`${meter.label} — ${Math.round(meter.pct)}%`
-      + (meter.resetsAt ? `, resets ${resetText}` : ''));
+    const head = `${meter.label} — ${Math.round(meter.pct)}%`
+      + (meter.resetsAt ? `, resets ${isWeekly(meter) ? resetDateTime(meter.resetsAt, true) : untilReset(meter.resetsAt)}` : '');
+    meterTray.setToolTip(fitTip([head, ...tipLines(p)]));
     meterTray.setContextMenu(buildMenu());
   }
+}
+
+/** Windows truncates tray tooltips at 127 UTF-16 units; drop whole lines instead. */
+function fitTip(lines, max = 127) {
+  const out = [];
+  for (const line of lines) {
+    const next = [...out, line].join('\n');
+    if (next.length > max) break;
+    out.push(line);
+  }
+  return out.join('\n') || lines[0].slice(0, max);
 }
 
 function destroyMeterTrays() {
@@ -369,7 +561,7 @@ function firstRun() {
       + 'meter runs in the background and you will not see it again.\n\n'
       + (IS_MAC
         ? 'Your usage appears in the menu bar.'
-        : 'Your usage percentages appear in the system tray. Hover a badge for its meter name and reset time.'),
+        : 'Your usage percentages appear in the system tray. Click a badge for the energy gauge, hover for pace, right-click for the menu.'),
     buttons: ['Sign in'],
   }).then(signIn);
 }
@@ -385,7 +577,9 @@ app.whenReady().then(() => {
   tray.setToolTip('Claude Usage Meter');
   // Windows convention: left-click opens the menu too, since there's no title
   // to click and users won't guess that right-click is the only way in.
-  if (!IS_MAC) tray.on('click', () => tray.popUpContextMenu());
+  if (!IS_MAC) tray.on('click', toggleGauge);
+  ipcMain.on('gauge:refresh', () => { poll(); pollContext(true); });
+  ipcMain.on('gauge:hide', () => gauge && gauge.hide());
   render();
 
   firstRun();
@@ -394,11 +588,18 @@ app.whenReady().then(() => {
 
   // Keeps the clock-relative labels ("resets in 2h 10m") honest between polls.
   setInterval(render, 30000);
+  // Context changes every turn; a stat + 512KB tail read every 5s is cheap.
+  pollContext(true);
+  setInterval(() => pollContext(false), 5000);
 
   autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 });
 
-app.on('second-instance', () => tray && tray.popUpContextMenu());
+app.on('second-instance', () => tray && showGauge());
 // The tray app has no windows by design; closing them must not quit it.
 app.on('window-all-closed', (e) => e.preventDefault());
-app.on('before-quit', () => { destroyMeterTrays(); if (fetcher) fetcher.destroy(); });
+app.on('before-quit', () => {
+  destroyMeterTrays();
+  if (contextTray) contextTray.destroy();
+  if (fetcher) fetcher.destroy();
+});

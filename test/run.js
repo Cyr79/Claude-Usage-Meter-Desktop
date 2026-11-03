@@ -97,4 +97,76 @@ test('forecast defers to the reset when it lands first', () => {
   assert.match(forecast(30, h, now + 4 * 3600, now), /at current pace/);
 });
 
+console.log('pace');
+const { pace, updateBaseline, tipLines } = require('../src/main/pace');
+const { lastUsage, contextLimit } = require('../src/main/context');
+const DAY = 86400;
+
+test('screenshot case: 87% with 8.4h left is under pace (expected ~95%)', () => {
+  const t = 1793750000;
+  const p = pace({ key: 'weekly', pct: 87, resetsAt: t + 0.35 * DAY }, null, t);
+  assert.ok(Math.abs(p.target - 14.2857) < 1e-3);
+  assert.ok(Math.abs(p.expected - 95) < 0.01);
+  assert.strictEqual(p.overPace, false);
+  assert.ok(Math.abs(p.budget - 13 / 0.35) < 0.01);
+});
+
+test('50% after 2 days is over pace', () => {
+  const t = 1793750000;
+  const p = pace({ key: 'weekly', pct: 50, resetsAt: t + 5 * DAY }, null, t);
+  assert.strictEqual(p.overPace, true);
+  assert.strictEqual(Math.round(p.avg), 25);
+});
+
+test('today burn vs remaining-budget allowance', () => {
+  const t = 1793750000;
+  const b = {};
+  updateBaseline(b, { key: 'weekly', pct: 30, resetsAt: t + 4 * DAY }, t - 60);
+  const p = pace({ key: 'weekly', pct: 50, resetsAt: t + 4 * DAY }, b.weekly, t);
+  assert.ok(Math.abs(p.allowance - 70 / 4) < 0.01);
+  assert.strictEqual(Math.round(p.today), 20);
+  assert.strictEqual(p.todayOver, true);
+  assert.strictEqual(p.hot, true);
+});
+
+test('reset restarts the day baseline', () => {
+  const t = 1793750000;
+  const b = {};
+  updateBaseline(b, { key: 'weekly', pct: 90, resetsAt: t }, t - 60);
+  updateBaseline(b, { key: 'weekly', pct: 1, resetsAt: t + 7 * DAY }, t);
+  assert.strictEqual(b.weekly.pct, 1);
+});
+
+test('session window paces per hour (20%/h)', () => {
+  const t = 1793750000;
+  const p = pace({ key: 'session', pct: 30, resetsAt: t + 4 * 3600 }, null, t);
+  assert.strictEqual(p.unit, 'h');
+  assert.strictEqual(p.target, 20);
+  assert.strictEqual(p.overPace, true);
+});
+
+test('tooltip lines fit Windows 127-char limit with header', () => {
+  const t = 1793750000;
+  const p = pace({ key: 'weekly', pct: 87, resetsAt: t + 0.35 * DAY }, { day: require('../src/main/pace').localDay(t), pct: 70, at: t - 3600 }, t);
+  const tip = ['Weekly — 87%, resets Wed, 4 Nov, 00:00', ...tipLines(p)].join('\n');
+  assert.ok(tip.length <= 127, tip.length);
+});
+
+console.log('context');
+
+test('context = input + cache_creation + cache_read of last main-chain turn', () => {
+  const rows = [
+    '{"cut line',
+    JSON.stringify({ type: 'assistant', message: { model: 'claude-opus-4', usage: { input_tokens: 5, cache_creation_input_tokens: 1000, cache_read_input_tokens: 50000, output_tokens: 300 } } }),
+    JSON.stringify({ type: 'assistant', isSidechain: true, message: { usage: { input_tokens: 9, cache_read_input_tokens: 9 } } }),
+  ].join('\n');
+  assert.deepStrictEqual(lastUsage(rows), { tokens: 51005, model: 'claude-opus-4' });
+});
+
+test('context limit auto-detects 1M', () => {
+  assert.strictEqual(contextLimit(150000, 'x', 'auto'), 200000);
+  assert.strictEqual(contextLimit(250000, 'x', 'auto'), 1000000);
+  assert.strictEqual(contextLimit(10, 'x', 200000), 200000);
+});
+
 console.log(`\n${passed} passed`);

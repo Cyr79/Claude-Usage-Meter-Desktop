@@ -101,11 +101,11 @@ function untilReset(resetsAt, now = Date.now() / 1000) {
   return `in ${formatDuration(resetsAt - now)}`;
 }
 
-function resetDateTime(resetsAt) {
+function resetDateTime(resetsAt, short = false) {
   if (!resetsAt) return 'unknown';
   return new Date(resetsAt * 1000).toLocaleString(undefined, {
     weekday: 'short',
-    year: 'numeric',
+    ...(short ? {} : { year: 'numeric' }),
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
