@@ -19,3 +19,6 @@ Screenshot-with-URL_Production/
 *.ipa
 *.apk
 
+
+# electron-builder output
+dist/
