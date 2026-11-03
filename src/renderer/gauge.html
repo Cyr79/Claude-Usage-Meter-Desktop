@@ -11,6 +11,9 @@
   html, body { margin: 0; background: transparent; }
   body { font: 12px/1.35 "Segoe UI", system-ui, sans-serif; color: var(--fg); user-select: none; }
   .card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; }
+  header { -webkit-app-region: drag; cursor: move; }
+  header button { -webkit-app-region: no-drag; }
+  header button.on { color: #ff9f0a; }
   header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   header b { font-size: 13px; }
   header button { background: none; border: 0; color: var(--mut); cursor: pointer; font-size: 13px; padding: 2px 4px; }
@@ -41,7 +44,7 @@
 </head>
 <body>
 <div class="card">
-  <header><b>⚡ Claude energy</b><span><button id="r" title="Refresh">⟳</button><button id="x" title="Close">✕</button></span></header>
+  <header><b>⚡ Claude energy</b><span><button id="p" title="Keep on screen (always on top)">📌</button><button id="r" title="Refresh">⟳</button><button id="x" title="Close">✕</button></span></header>
   <div id="list"><div class="empty">Waiting for first reading…</div></div>
   <footer><span id="upd"></span><span>white tick = where you should be</span></footer>
 </div>
@@ -101,9 +104,14 @@
     else if (!d.meters.length) html += `<div class="empty">${esc(d.error || 'Waiting for first reading…')}</div>`;
     else html += d.meters.map(meterBlock).join('');
     $('#list').innerHTML = html;
+    const pin = $('#p');
+    pin.classList.toggle('on', !!d.pinned);
+    pin.title = d.pinned ? 'Pinned: always on top, drag the title to move. Click to unpin' : 'Keep on screen (always on top)';
+    pin.style.filter = d.pinned ? 'none' : 'grayscale(1) opacity(.55)';
     $('#upd').textContent = d.updated ? 'Updated ' + new Date(d.updated).toLocaleTimeString() : '';
   });
   $('#r').onclick = () => window.meter.refresh();
+  $('#p').onclick = () => window.meter.pin();
   $('#x').onclick = () => window.meter.hide();
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.meter.hide(); });
 </script>

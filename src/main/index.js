@@ -160,7 +160,16 @@ function meterSubmenu(meter) {
 }
 
 function buildMenu() {
-  const items = [{ label: '⚡ Show energy gauge', click: showGauge }, { type: 'separator' }];
+  const items = [
+    { label: '⚡ Show energy gauge', click: showGauge },
+    {
+      label: '📌 Keep gauge on screen (always on top)',
+      type: 'checkbox',
+      checked: !!store.get('gaugePinned'),
+      click: (item) => { setPinned(item.checked); if (item.checked) showGauge(); },
+    },
+    { type: 'separator' },
+  ];
 
   if (state.needsLogin) {
     items.push(
@@ -320,6 +329,7 @@ function render() {
 function gaugeData() {
   return {
     needsLogin: state.needsLogin,
+    pinned: !!store.get('gaugePinned'),
     error: state.lastError,
     updated: state.lastOkAt,
     context: { enabled: !!store.get('showContext'), ...(state.context || {}) },
@@ -337,6 +347,8 @@ function gaugeData() {
 function pushGauge() {
   if (gauge && !gauge.isDestroyed() && gauge.isVisible()) {
     gauge.webContents.send('gauge:data', gaugeData());
+    // Pinned gauge is live: content height changes (context bar appears etc.).
+    if (store.get('gaugePinned')) fitGauge();
   }
 }
 
@@ -358,9 +370,27 @@ function createGauge() {
       sandbox: true,
     },
   });
+  if (store.get('gaugePinned')) gauge.setAlwaysOnTop(true, 'screen-saver');
   gauge.loadFile(path.join(__dirname, '..', 'renderer', 'gauge.html'));
   gauge.on('blur', () => { if (!store.get('gaugePinned')) { gaugeHiddenAt = Date.now(); gauge.hide(); } });
   gauge.webContents.on('did-finish-load', () => { fitGauge(); pushGauge(); });
+  gauge.on('moved', () => {
+    if (!store.get('gaugePinned')) return;
+    const [x, y] = gauge.getPosition();
+    store.set('gaugePos', { x, y });
+  });
+}
+
+function setPinned(pinned) {
+  store.set('gaugePinned', pinned);
+  if (gauge && !gauge.isDestroyed()) {
+    if (pinned) {
+      const [x, y] = gauge.getPosition();
+      store.set('gaugePos', { x, y });
+    }
+    gauge.setAlwaysOnTop(true, pinned ? 'screen-saver' : 'floating');
+  }
+  render();
 }
 
 function fitGauge() {
@@ -375,6 +405,16 @@ function fitGauge() {
 }
 
 function placeGauge() {
+  const saved = store.get('gaugePos');
+  if (store.get('gaugePinned') && saved) {
+    const { workArea } = screen.getDisplayNearestPoint(saved);
+    const [w, h] = gauge.getSize();
+    gauge.setPosition(
+      Math.max(workArea.x, Math.min(saved.x, workArea.x + workArea.width - w)),
+      Math.max(workArea.y, Math.min(saved.y, workArea.y + workArea.height - h)),
+    );
+    return;
+  }
   const bounds = tray ? tray.getBounds() : { x: 0, y: 0, width: 0, height: 0 };
   const point = bounds.width ? { x: bounds.x, y: bounds.y } : screen.getCursorScreenPoint();
   const { workArea } = screen.getDisplayNearestPoint(point);
@@ -390,8 +430,9 @@ function placeGauge() {
 function showGauge() {
   if (!gauge || gauge.isDestroyed()) createGauge();
   placeGauge();
-  gauge.show();
-  gauge.focus();
+  // Pinned (incl. at startup): appear without stealing focus from your work.
+  if (store.get('gaugePinned')) gauge.showInactive();
+  else { gauge.show(); gauge.focus(); }
   pushGauge();
   fitGauge();
 }
@@ -579,7 +620,9 @@ app.whenReady().then(() => {
   // to click and users won't guess that right-click is the only way in.
   if (!IS_MAC) tray.on('click', toggleGauge);
   ipcMain.on('gauge:refresh', () => { poll(); pollContext(true); });
-  ipcMain.on('gauge:hide', () => gauge && gauge.hide());
+  ipcMain.on('gauge:hide', () => { if (store.get('gaugePinned')) setPinned(false); if (gauge) gauge.hide(); });
+  ipcMain.on('gauge:pin', () => setPinned(!store.get('gaugePinned')));
+  if (store.get('gaugePinned')) setTimeout(showGauge, 1500);
   render();
 
   firstRun();

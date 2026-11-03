@@ -26,6 +26,11 @@ green → amber → red and pulse near the limit. The **white tick** is where yo
 *should* be if usage were spread evenly over the window: bar past the tick =
 ahead of pace. **Right-click** opens the menu.
 
+**📌 Pin it** (new in 1.2): click the pin in the gauge title, or menu →
+*Keep gauge on screen*. The gauge then stays always on top, doesn't close when
+you click elsewhere, can be dragged by its title anywhere, and comes back at the
+same spot when the app starts. Click 📌 again or ✕ to unpin.
+
 ### 📅 Daily pace (new in 1.1)
 A weekly limit allows **100% / 7 days = 14.3% per day**. Hover the Weekly badge:
 
@@ -143,6 +148,7 @@ the number drawn into it, and the details live in the tooltip and the gauge.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.2.0** — 📌 Pin the energy gauge: always on top, draggable, remembered position.
 - **1.1.1** — "Left 10% · 5h 16m" replaces the confusing %/day figure when less than a day remains.
 - **1.1.0** — Energy gauge popup, daily pace vs 100%/7 with red badges, Claude Code context meter.
 - **1.0.3** — Weekly reset shown as date and time; larger Windows badges.

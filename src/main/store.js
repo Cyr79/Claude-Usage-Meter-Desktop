@@ -31,6 +31,7 @@ const DEFAULTS = {
   contextBadge: true,
   contextLimit: 'auto',
   gaugePinned: false,
+  gaugePos: null,
   settingsVersion: SETTINGS_VERSION,
 };
 
