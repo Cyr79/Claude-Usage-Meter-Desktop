@@ -47,12 +47,44 @@ const JS_USAGE = (orgId) => `
 
 class AuthError extends Error {}
 
+// After the direct path fails (bot check), use the browser window for a while.
+const FALLBACK_MS = 30 * 60 * 1000;
+
 class Fetcher {
   constructor(store) {
     this.store = store;
     this.window = null;
     this.orgUuid = store.get('orgUuid') || null;
     this.lastDiagnostic = {};
+    this.fallbackUntil = 0;
+  }
+
+  /**
+   * GET an /api path straight through the session's Chromium network stack:
+   * same cookies, same TLS fingerprint, same UA as the window — but no page,
+   * no renderer process. That renderer was ~250 MB just to hold the session.
+   */
+  async directGet(path) {
+    const ses = session.fromPartition(PARTITION);
+    const r = await ses.fetch(ORIGIN + path, {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': cleanUserAgent(),
+        Referer: ORIGIN + '/',
+        Origin: ORIGIN,
+      },
+    });
+    const text = await r.text();
+    let body = null;
+    try { body = JSON.parse(text); } catch (e) { /* challenge page or empty */ }
+    return { status: r.status, body, sample: text.slice(0, 300), json: body !== null };
+  }
+
+  windowGet(win) {
+    return (path) => this.run(win, path.endsWith('/usage')
+      ? JS_USAGE(path.split('/')[3])
+      : JS_ORGS);
   }
 
   createWindow({ show = false } = {}) {
@@ -90,14 +122,14 @@ class Fetcher {
     return win.webContents.executeJavaScript(script, true);
   }
 
-  async resolveOrg(win, { force = false } = {}) {
+  async resolveOrg(get, { force = false } = {}) {
     if (!force) {
       const pinned = this.store.get('orgUuid');
       if (pinned) return pinned;
       if (this.orgUuid) return this.orgUuid;
     }
 
-    const res = await this.run(win, JS_ORGS);
+    const res = await get('/api/organizations');
     this.lastDiagnostic.organizations = { status: res.status, sample: res.sample };
 
     if (res.status === 401 || res.status === 403) {
@@ -121,8 +153,8 @@ class Fetcher {
     return this.orgUuid;
   }
 
-  async fetchUsage(win, orgId) {
-    const res = await this.run(win, JS_USAGE(orgId));
+  async fetchUsage(get, orgId) {
+    const res = await get(`/api/organizations/${orgId}/usage`);
     this.lastDiagnostic.usage = { status: res.status, sample: res.sample };
     if (res.status === 401 || res.status === 403) {
       throw new AuthError(`Session rejected by /usage (HTTP ${res.status}).`);
@@ -133,12 +165,36 @@ class Fetcher {
 
   /** One full poll. Throws AuthError when the session is genuinely rejected. */
   async poll() {
+    if (Date.now() >= this.fallbackUntil) {
+      try {
+        const get = (p) => this.directGet(p);
+        // A bot-check page is HTML, not JSON: treat as "direct path blocked".
+        const guard = async (p) => {
+          const res = await get(p);
+          if (!res.json && res.status !== 401) throw Object.assign(new Error('direct blocked'), { res });
+          return res;
+        };
+        const org = await this.resolveOrg(guard);
+        const raw = await this.fetchUsage(guard, org);
+        this.lastDiagnostic.mode = 'direct';
+        // Direct works: the hidden page is dead weight, free it.
+        if (this.window && !this.window.isDestroyed() && !this.window.isVisible()) this.destroy();
+        return { raw, orgUuid: org };
+      } catch (err) {
+        // 401 = really signed out. 403 may be the bot filter, so verify below.
+        if (err instanceof AuthError && /HTTP 401/.test(err.message)) throw err;
+        this.lastDiagnostic.directError = err.message;
+        this.fallbackUntil = Date.now() + FALLBACK_MS;
+      }
+    }
     const win = await this.ensureWindow();
     if (!win.webContents.getURL().startsWith(ORIGIN)) {
       await win.loadURL(ORIGIN + '/');
     }
-    const org = await this.resolveOrg(win);
-    return { raw: await this.fetchUsage(win, org), orgUuid: org };
+    const get = this.windowGet(win);
+    const org = await this.resolveOrg(get);
+    this.lastDiagnostic.mode = 'window';
+    return { raw: await this.fetchUsage(get, org), orgUuid: org };
   }
 
   /**
@@ -164,10 +220,13 @@ class Fetcher {
         return onDone(false);
       }
       try {
-        const org = await this.resolveOrg(win, { force: true });
-        await this.fetchUsage(win, org);
-        win.hide();
-        win.setSkipTaskbar(true);
+        const get = this.windowGet(win);
+        const org = await this.resolveOrg(get, { force: true });
+        await this.fetchUsage(get, org);
+        this.fallbackUntil = 0;
+        // Cookies live in the persist:claude partition; the window can go.
+        win.destroy();
+        this.window = null;
         return onDone(true);
       } catch (err) {
         setTimeout(check, 2000);

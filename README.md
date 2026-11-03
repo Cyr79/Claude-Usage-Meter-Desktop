@@ -113,7 +113,7 @@ Optional — unset means unsigned builds with OS warnings.
 
 ```
 src/main/index.js     tray, menu, polling, energy gauge window, auto-launch
-src/main/fetcher.js   hidden BrowserWindow holding the claude.ai session
+src/main/fetcher.js   direct /api fetch via the persist:claude session (window only for sign-in / fallback)
 src/main/parse.js     tolerant tree-walk over the /usage payload
 src/main/forecast.js  reset detection + burn-rate regression
 src/main/pace.js      daily pace vs 100%/window, today's allowance
@@ -148,6 +148,7 @@ the number drawn into it, and the details live in the tooltip and the gauge.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.2.1** — Lighter: usage is read straight from the API (no hidden claude.ai page; window only for sign-in or as fallback), closed gauge is freed.
 - **1.2.0** — 📌 Pin the energy gauge: always on top, draggable, remembered position.
 - **1.1.1** — "Left 10% · 5h 16m" replaces the confusing %/day figure when less than a day remains.
 - **1.1.0** — Energy gauge popup, daily pace vs 100%/7 with red badges, Claude Code context meter.

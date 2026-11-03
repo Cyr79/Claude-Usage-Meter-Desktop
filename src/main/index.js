@@ -372,13 +372,21 @@ function createGauge() {
   });
   if (store.get('gaugePinned')) gauge.setAlwaysOnTop(true, 'screen-saver');
   gauge.loadFile(path.join(__dirname, '..', 'renderer', 'gauge.html'));
-  gauge.on('blur', () => { if (!store.get('gaugePinned')) { gaugeHiddenAt = Date.now(); gauge.hide(); } });
+  gauge.on('blur', () => { if (!store.get('gaugePinned')) closeGauge(); });
+  gauge.on('closed', () => { gauge = null; });
   gauge.webContents.on('did-finish-load', () => { fitGauge(); pushGauge(); });
   gauge.on('moved', () => {
     if (!store.get('gaugePinned')) return;
     const [x, y] = gauge.getPosition();
     store.set('gaugePos', { x, y });
   });
+}
+
+/** Unpinned gauge is destroyed, not hidden: a hidden renderer still costs ~90 MB. */
+function closeGauge() {
+  gaugeHiddenAt = Date.now();
+  if (gauge && !gauge.isDestroyed()) gauge.destroy();
+  gauge = null;
 }
 
 function setPinned(pinned) {
@@ -440,7 +448,7 @@ function showGauge() {
 function toggleGauge() {
   // A click on the tray blurs the popup first; don't instantly reopen it.
   if (Date.now() - gaugeHiddenAt < 350) return;
-  if (gauge && !gauge.isDestroyed() && gauge.isVisible()) gauge.hide();
+  if (gauge && !gauge.isDestroyed() && gauge.isVisible()) closeGauge();
   else showGauge();
 }
 
@@ -620,7 +628,7 @@ app.whenReady().then(() => {
   // to click and users won't guess that right-click is the only way in.
   if (!IS_MAC) tray.on('click', toggleGauge);
   ipcMain.on('gauge:refresh', () => { poll(); pollContext(true); });
-  ipcMain.on('gauge:hide', () => { if (store.get('gaugePinned')) setPinned(false); if (gauge) gauge.hide(); });
+  ipcMain.on('gauge:hide', () => { if (store.get('gaugePinned')) setPinned(false); closeGauge(); });
   ipcMain.on('gauge:pin', () => setPinned(!store.get('gaugePinned')));
   if (store.get('gaugePinned')) setTimeout(showGauge, 1500);
   render();
