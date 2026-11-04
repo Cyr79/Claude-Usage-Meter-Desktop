@@ -10,7 +10,7 @@ macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 
 <img src="docs/energy-gauge.png" width="360" alt="Energy gauge popup">
 
-<sub>Screenshot with sample data.</sub>
+<sub>Energy gauge, pinned (v1.2). Sample data.</sub>
 
 ## Features
 
@@ -26,16 +26,40 @@ green → amber → red and pulse near the limit. The **white tick** is where yo
 *should* be if usage were spread evenly over the window: bar past the tick =
 ahead of pace. **Right-click** opens the menu.
 
-**📌 Pin it** (new in 1.2): click the pin in the gauge title, or menu →
+**📌 Pin it** (new in 1.2.0): click the pin in the gauge title, or menu →
 *Keep gauge on screen*. The gauge then stays always on top, doesn't close when
 you click elsewhere, can be dragged by its title anywhere, and comes back at the
 same spot when the app starts. Click 📌 again or ✕ to unpin.
+
+### 🪶 Light on resources (new in 1.2.1)
+Usage is read straight from Claude's API through Electron's own network stack,
+using the saved sign-in. Earlier versions kept a hidden claude.ai page open
+just to stay signed in; that page is gone. A browser window opens only for
+sign-in, and as an automatic fallback for 30 min if claude.ai's bot check ever
+blocks the direct request. The gauge window is freed when closed (kept only
+while pinned).
+
+Measured on Windows 11, 16 cores, app idle in the tray:
+
+| | 1.1.1 | 1.2.1 |
+|---|---|---|
+| Processes | 6 | 3 |
+| RAM (Task Manager) | 995 MB | **217 MB** |
+| RAM used by the app alone | 498 MB | 251 MB |
+| CPU | 0.55% of one core | 0.16% of one core |
+
+Opening the gauge adds about 90 MB, freed again when it closes.
+
+### 🕛 Reset time (new in 1.2.2)
+A reset at midnight is shown as **23:59 of the last day you can still use**,
+with the day name, e.g. `resets Tue 10 Nov 23:59`, instead of
+`Wed 00:00` or "tonight".
 
 ### 📅 Daily pace (new in 1.1)
 A weekly limit allows **100% / 7 days = 14.3% per day**. Hover the Weekly badge:
 
 ```
-Weekly — 90%, resets ons 4 nov. 00:00
+Weekly — 90%, resets tis 3 nov. 23:59
 🟢 Avg 13.3%/d · target 14.3
 🟢 Today +1.0% (max 11.0)
 Left 10.0% · 5h 16m
