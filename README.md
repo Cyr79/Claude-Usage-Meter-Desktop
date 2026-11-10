@@ -10,7 +10,7 @@ macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 
 <img src="docs/energy-gauge.png" width="360" alt="Energy gauge popup">
 
-<sub>Energy gauge, pinned (v1.2). Sample data.</sub>
+<sub>Energy gauge, pinned (v1.3). Sample data.</sub>
 
 ## Features
 
@@ -31,6 +31,18 @@ ahead of pace. **Right-click** opens the menu.
 you click elsewhere, can be dragged by its title anywhere, and comes back at the
 same spot when the app starts. Click 📌 again or ✕ to unpin.
 
+### ✳ Open Claude Desktop, About, Fable (new in 1.3)
+- **Open Claude Desktop:** right-click a badge → *Open Claude Desktop*, or the
+  ✳ button in the gauge title. Falls back to claude.ai in the browser when the
+  desktop app isn't installed.
+- **About:** right-click → *About Claude Usage Meter…* shows the version, this
+  repo, the credit to the original project and a privacy note.
+- **Fable limit:** Claude now reports model-scoped limits in a new `limits[]`
+  list; the Fable gauge and badge are read from there. Limits Claude doesn't
+  report separately for your account are greyed out in Display.
+- **Security:** Electron 32 → 45 (the old one had known vulnerabilities), and
+  the organization id returned by claude.ai is validated before use.
+
 ### 🪶 Light on resources (new in 1.2.1)
 Usage is read straight from Claude's API through Electron's own network stack,
 using the saved sign-in. Earlier versions kept a hidden claude.ai page open
@@ -48,7 +60,8 @@ Measured on Windows 11, 16 cores, app idle in the tray:
 | RAM used by the app alone | 498 MB | 251 MB |
 | CPU | 0.55% of one core | 0.16% of one core |
 
-Opening the gauge adds about 90 MB, freed again when it closes.
+Opening the gauge adds about 90 MB, freed again when it closes. On 1.3
+(Electron 45) the idle figure is about 280 MB.
 
 ### 🕛 Reset time (new in 1.2.2)
 A reset at midnight is shown as **23:59 of the last day you can still use**,
@@ -114,7 +127,7 @@ npm start
 ## Build
 
 ```bash
-npm test          # 20 tests: parse, forecast, pace, context
+npm test          # 21 tests: parse, forecast, pace, context
 npm run dist:win  # NSIS installer
 npm run dist:mac  # DMG (arm64 + x64)
 ```
@@ -166,12 +179,19 @@ the number drawn into it, and the details live in the tooltip and the gauge.
   `fetcher.js` strips it.
 - **Auth state.** Only a real 401/403 means "signed out"; other failures show an error.
 
+## Credits and privacy
+Fork of [Claude Usage Meter](https://github.com/SelectorsHub/Claude-Usage-Meter-Desktop)
+by SelectorsHub (MIT). Independent project, not affiliated with Anthropic.
+The app talks only to claude.ai with your own sign-in and to GitHub for
+updates; your login stays on your PC.
+
 ## Known limits
 - **Free plans don't work:** `/usage` returns nothing for unmetered accounts.
 - **Context meter is Claude Code only** (see above).
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.3.0** — Open Claude Desktop shortcut, About dialog, Fable limit detected, Electron 45, greyed-out unreported limits.
 - **1.2.2** — Midnight resets shown as 23:59 of the last day, with the day name.
 - **1.2.1** — Lighter: usage is read straight from the API (no hidden claude.ai page; window only for sign-in or as fallback), closed gauge is freed.
 - **1.2.0** — 📌 Pin the energy gauge: always on top, draggable, remembered position.
