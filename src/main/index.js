@@ -279,7 +279,7 @@ function buildMenu() {
     display.push({
       // No data for this limit on the account -> greyed out, not a dead tick.
       label: `Show ${LABELS[key]}` + (state.meters.length && !state.meters.some((m) => m.key === key)
-        ? '  (not reported for your plan)' : ''),
+        ? '  (no separate limit on your account)' : ''),
       enabled: !state.meters.length || state.meters.some((m) => m.key === key),
       type: 'checkbox',
       checked: (store.get('show') || []).includes(key),
