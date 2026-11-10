@@ -47,6 +47,8 @@ const JS_USAGE = (orgId) => `
 
 class AuthError extends Error {}
 
+const SAFE_ID = /^[A-Za-z0-9-]{8,64}$/;
+
 // After the direct path fails (bot check), use the browser window for a while.
 const FALLBACK_MS = 30 * 60 * 1000;
 
@@ -125,8 +127,8 @@ class Fetcher {
   async resolveOrg(get, { force = false } = {}) {
     if (!force) {
       const pinned = this.store.get('orgUuid');
-      if (pinned) return pinned;
-      if (this.orgUuid) return this.orgUuid;
+      if (SAFE_ID.test(pinned || '')) return pinned;
+      if (SAFE_ID.test(this.orgUuid || '')) return this.orgUuid;
     }
 
     const res = await get('/api/organizations');
@@ -148,7 +150,10 @@ class Fetcher {
       return (caps.includes('chat') ? 2 : 0) - (caps.includes('api') ? 1 : 0);
     };
     const best = orgs.reduce((a, b) => (score(b) > score(a) ? b : a));
-    this.orgUuid = best.uuid || best.id;
+    const id = String(best.uuid || best.id || '');
+    // It is interpolated into a script and a URL: accept only an id shape.
+    if (!SAFE_ID.test(id)) throw new Error('Unexpected organization id format.');
+    this.orgUuid = id;
     this.store.set('orgUuid', this.orgUuid);
     return this.orgUuid;
   }

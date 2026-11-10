@@ -1,6 +1,8 @@
+# Kept from the original on purpose: changing it would install a second copy
+# beside the existing one instead of updating it.
 appId: com.selectorshub.claudeusagemeter
 productName: Claude Usage Meter
-copyright: SelectorsHub
+copyright: Cyr79 — fork of Claude Usage Meter by SelectorsHub
 
 directories:
   output: dist

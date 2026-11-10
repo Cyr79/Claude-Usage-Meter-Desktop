@@ -1,11 +1,11 @@
 {
   "name": "claude-usage-meter",
   "productName": "Claude Usage Meter",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Claude.ai usage in your menu bar / system tray",
   "main": "src/main/index.js",
-  "author": "SelectorsHub",
-  "homepage": "https://selectorshub.com",
+  "author": "Cyr79",
+  "homepage": "https://github.com/Cyr79/Claude-Usage-Meter-Desktop",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -17,11 +17,11 @@
     "icons": "node tools/make-tray-icons.js"
   },
   "devDependencies": {
-    "electron": "^32.0.0",
-    "electron-builder": "^25.0.0",
-    "sharp": "^0.33.0"
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "sharp": "^0.35.5"
   },
   "dependencies": {
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.8.11"
   }
 }

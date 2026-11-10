@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('meter', {
   refresh: () => ipcRenderer.send('gauge:refresh'),
   hide: () => ipcRenderer.send('gauge:hide'),
   pin: () => ipcRenderer.send('gauge:pin'),
+  openClaude: () => ipcRenderer.send('gauge:claude'),
 });

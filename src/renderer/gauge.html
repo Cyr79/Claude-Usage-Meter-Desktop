@@ -44,7 +44,7 @@
 </head>
 <body>
 <div class="card">
-  <header><b>⚡ Claude energy</b><span><button id="p" title="Keep on screen (always on top)">📌</button><button id="r" title="Refresh">⟳</button><button id="x" title="Close">✕</button></span></header>
+  <header><b>⚡ Claude energy</b><span><button id="c" title="Open Claude Desktop">✳</button><button id="p" title="Keep on screen (always on top)">📌</button><button id="r" title="Refresh">⟳</button><button id="x" title="Close">✕</button></span></header>
   <div id="list"><div class="empty">Waiting for first reading…</div></div>
   <footer><span id="upd"></span><span>white tick = where you should be</span></footer>
 </div>
@@ -112,6 +112,7 @@
   });
   $('#r').onclick = () => window.meter.refresh();
   $('#p').onclick = () => window.meter.pin();
+  $('#c').onclick = () => window.meter.openClaude();
   $('#x').onclick = () => window.meter.hide();
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.meter.hide(); });
 </script>

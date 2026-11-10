@@ -286,6 +286,7 @@ function buildMenu() {
   items.push({ label: 'Display', submenu: display });
 
   items.push(
+    { label: 'Open Claude Desktop', click: openClaudeDesktop },
     { label: 'Open claude.ai', click: () => shell.openExternal(ORIGIN) },
     { label: 'Sign in again…', click: signIn },
     { label: 'Copy diagnostics', click: copyDiagnostics },
@@ -296,6 +297,7 @@ function buildMenu() {
       click: (item) => setLoginItem(item.checked),
     },
     { type: 'separator' },
+    { label: 'About Claude Usage Meter…', click: showAbout },
     { label: 'Quit', click: () => app.quit() },
   );
 
@@ -322,6 +324,48 @@ function render() {
   tray.setContextMenu(buildMenu());
   if (process.platform === 'win32') renderContextTray();
   pushGauge();
+}
+
+// ------------------------------------------------- Claude Desktop / About
+
+/**
+ * Launch the Claude desktop app via its own claude:// link (registered by both
+ * the Store/MSIX and the older installer). No paths, no shell commands.
+ * Not installed -> open claude.ai in the browser instead.
+ */
+function openClaudeDesktop() {
+  if (app.getApplicationNameForProtocol('claude://')) {
+    shell.openExternal('claude://').catch(() => shell.openExternal(ORIGIN));
+  } else {
+    shell.openExternal(ORIGIN);
+  }
+}
+
+const REPO_URL = 'https://github.com/Cyr79/Claude-Usage-Meter-Desktop';
+
+function showAbout() {
+  const v = process.versions;
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'About Claude Usage Meter',
+    message: `Claude Usage Meter ${app.getVersion()}`,
+    detail: [
+      'Your Claude.ai usage limits in the tray, with daily pace and live Claude Code context.',
+      '',
+      `Fork maintained by Cyr79 — ${REPO_URL}`,
+      'Based on the original Claude Usage Meter by SelectorsHub.',
+      'Independent project, not affiliated with Anthropic.',
+      '',
+      'Privacy: talks only to claude.ai with your own sign-in and to GitHub for updates.',
+      'Your login stays on this PC; nothing is sent anywhere else.',
+      '',
+      `Electron ${v.electron} · Chromium ${v.chrome} · Node ${v.node}`,
+    ].join('\n'),
+    buttons: ['OK', 'Open on GitHub'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  }).then(({ response }) => { if (response === 1) shell.openExternal(REPO_URL); });
 }
 
 // ----------------------------------------------------------- energy gauge
@@ -630,6 +674,7 @@ app.whenReady().then(() => {
   ipcMain.on('gauge:refresh', () => { poll(); pollContext(true); });
   ipcMain.on('gauge:hide', () => { if (store.get('gaugePinned')) setPinned(false); closeGauge(); });
   ipcMain.on('gauge:pin', () => setPinned(!store.get('gaugePinned')));
+  ipcMain.on('gauge:claude', openClaudeDesktop);
   if (store.get('gaugePinned')) setTimeout(showGauge, 1500);
   render();
 
