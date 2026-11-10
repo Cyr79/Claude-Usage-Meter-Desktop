@@ -8,9 +8,14 @@ Windows   numbered tray badges · hover for pace · click for the energy gauge
 macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 ```
 
-<img src="docs/energy-gauge.png" width="360" alt="Energy gauge popup">
+<p>
+  <img src="docs/energy-gauge-real.png" width="360" alt="Energy gauge popup on Windows 11">
+  &nbsp;
+  <img src="docs/tray-tooltip.png" width="300" alt="Tray badges and Fable pace tooltip">
+</p>
 
-<sub>Energy gauge, pinned (v1.3). Sample data.</sub>
+<sub>Left: the energy gauge, pinned, on Windows 11 (v1.3). Right: tray badges
+(Fable 16, Weekly 77, Session 64) and the pace tooltip of the Fable badge.</sub>
 
 ## Features
 
