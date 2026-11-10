@@ -83,12 +83,41 @@ function contextLimit(tokens, model, limitSetting) {
   return 200000;
 }
 
+// Called every 5s, so keep it to one stat() in the common case: the full folder
+// scan runs at most every 20s, and the 512 KB tail is only re-read when
+// the transcript actually changed.
+const RESCAN_MS = 20 * 1000;
+const cache = { scanAt: 0, t: null, sig: '', usage: null };
+
+function currentTranscript(now) {
+  if (cache.t && now - cache.scanAt < RESCAN_MS) {
+    try {
+      const st = fs.statSync(cache.t.file);
+      cache.t = { ...cache.t, mtimeMs: st.mtimeMs, size: st.size };
+      return cache.t;
+    } catch { /* deleted: fall through to a rescan */ }
+  }
+  cache.scanAt = now;
+  cache.t = newestTranscript();
+  if (cache.t) {
+    try { cache.t.size = fs.statSync(cache.t.file).size; } catch { cache.t.size = -1; }
+  }
+  return cache.t;
+}
+
 function readContext(limitSetting = 'auto', now = Date.now()) {
-  const t = newestTranscript();
+  const t = currentTranscript(now);
   if (!t) return { available: false, reason: 'No Claude Code transcripts found' };
   const idleSec = (now - t.mtimeMs) / 1000;
   let usage = null;
-  try { usage = lastUsage(readTail(t.file)); } catch (e) { return { available: false, reason: e.message }; }
+  const sig = `${t.file}|${t.mtimeMs}|${t.size}`;
+  try {
+    if (sig !== cache.sig) {
+      cache.usage = lastUsage(readTail(t.file));
+      cache.sig = sig;
+    }
+    usage = cache.usage;
+  } catch (e) { return { available: false, reason: e.message }; }
   if (!usage) return { available: false, reason: 'No usage in latest session yet' };
   const limit = contextLimit(usage.tokens, usage.model, limitSetting);
   return {

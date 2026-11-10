@@ -26,11 +26,12 @@
   .track { position: relative; height: 14px; border-radius: 7px; background: var(--track); overflow: hidden; }
   .fill { position: absolute; inset: 0 auto 0 0; border-radius: 7px; transition: width .6s ease, background .4s ease; }
   .fill::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 18px;
-                 background: rgba(255,255,255,.45); filter: blur(4px); animation: pulse 1.6s infinite ease-in-out; }
-  .fill.full { animation: alarm .9s infinite ease-in-out; }
+                 background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.4)); }
+  /* Only a nearly full bar animates, and only opacity (cheap). An endless glow
+     on every bar kept a pinned gauge repainting: ~4-12% of a core measured. */
+  .fill.full { animation: alarm 1.2s infinite ease-in-out; }
   .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: .85; border-radius: 1px; }
-  @keyframes pulse { 0%,100% { opacity: .15 } 50% { opacity: .9 } }
-  @keyframes alarm { 0%,100% { filter: brightness(1) } 50% { filter: brightness(1.45) } }
+  @keyframes alarm { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
   .sub { color: var(--mut); margin-top: 5px; }
   .pace { margin-top: 3px; font-variant-numeric: tabular-nums; }
   .hot { color: var(--red); }
