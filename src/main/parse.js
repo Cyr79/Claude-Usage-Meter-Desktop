@@ -124,6 +124,38 @@ function extractMeters(raw) {
     if (!existing || depth(path) < depth(existing.path)) found.set(key, meter);
   }
 
+  // Newer payloads list limits as `limits[]` with `percent` and a model scope
+  // (e.g. Fable: kind "weekly_scoped", scope.model.display_name "Fable").
+  // Top-level fields found above win; this only fills what they lack.
+  if (Array.isArray(raw.limits)) {
+    raw.limits.forEach((item, i) => {
+      if (!item || typeof item !== 'object') return;
+      const pct = toPct(item.percent);
+      if (pct === null) return;
+      const model = item.scope && item.scope.model && item.scope.model.display_name;
+      const hay = `${item.kind || ''} ${item.group || ''} ${model || ''}`.toLowerCase();
+      let key;
+      if (model) {
+        if (FABLE_HINTS.some((h) => hay.includes(h))) key = 'fable';
+        else if (OPUS_HINTS.some((h) => hay.includes(h))) key = 'weekly_opus';
+        else key = 'scoped:' + String(model).toLowerCase();
+      } else if (hay.includes('session')) key = 'session';
+      else if (hay.includes('weekly')) key = 'weekly';
+      else return;
+      if (found.has(key)) return;
+      const label = LABELS[key] || String(model);
+      found.set(key, {
+        key,
+        label,
+        short: SHORT[key] || label.charAt(0).toUpperCase(),
+        pct,
+        resetsAt: parseTimestamp(item.resets_at),
+        path: `limits[${i}]`,
+        known: key in LABELS,
+      });
+    });
+  }
+
   return [...found.values()].sort((a, b) => {
     const ai = CANONICAL_ORDER.indexOf(a.key);
     const bi = CANONICAL_ORDER.indexOf(b.key);

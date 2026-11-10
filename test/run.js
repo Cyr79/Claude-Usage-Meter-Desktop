@@ -97,6 +97,25 @@ test('forecast defers to the reset when it lands first', () => {
   assert.match(forecast(30, h, now + 4 * 3600, now), /at current pace/);
 });
 
+test('Fable from limits[] (weekly_scoped + model scope)', () => {
+  const raw = {
+    five_hour: { utilization: 41, resets_at: '2026-11-10T12:19:59+00:00' },
+    seven_day: { utilization: 73, resets_at: '2026-11-10T22:59:59+00:00' },
+    seven_day_opus: null,
+    extra_usage: { utilization: null },
+    spend: { used: { amount_minor: 0 }, limit: null, percent: 0 },
+    limits: [
+      { kind: 'session', group: 'session', percent: 41, resets_at: '2026-11-10T12:19:59+00:00', scope: null },
+      { kind: 'weekly_all', group: 'weekly', percent: 73, resets_at: '2026-11-10T22:59:59+00:00', scope: null },
+      { kind: 'weekly_scoped', group: 'weekly', percent: 11, resets_at: '2026-11-10T22:59:59+00:00', scope: { model: { id: null, display_name: 'Fable' }, surface: null } },
+    ],
+  };
+  const m = extractMeters(raw);
+  assert.deepStrictEqual(m.map((x) => [x.key, x.pct]), [['session', 41], ['weekly', 73], ['fable', 11]]);
+  assert.strictEqual(m[2].path, 'limits[2]');
+  assert.ok(m[2].resetsAt > 0);
+});
+
 console.log('pace');
 const { pace, updateBaseline, tipLines } = require('../src/main/pace');
 const { lastUsage, contextLimit } = require('../src/main/context');

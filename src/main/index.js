@@ -277,7 +277,10 @@ function buildMenu() {
   );
   for (const key of CANONICAL_ORDER) {
     display.push({
-      label: `Show ${LABELS[key]}`,
+      // No data for this limit on the account -> greyed out, not a dead tick.
+      label: `Show ${LABELS[key]}` + (state.meters.length && !state.meters.some((m) => m.key === key)
+        ? '  (not reported for your plan)' : ''),
+      enabled: !state.meters.length || state.meters.some((m) => m.key === key),
       type: 'checkbox',
       checked: (store.get('show') || []).includes(key),
       click: () => toggleShow(key),
