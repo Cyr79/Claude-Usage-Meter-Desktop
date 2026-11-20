@@ -89,9 +89,19 @@ Left 10.0% · 5h 16m
 | **Today** | used since midnight, vs the most you can spend today and still last until the reset |
 | **Left** | what remains and the time until reset; with more than a day left it adds the %/day you can afford, e.g. `(17.1%/d)` |
 
-🟢 on pace · 🔴 over. The badge itself turns **red** when you are over pace or
-over today's allowance (Display → *Red badge when over daily pace*). The 5-hour
-Session meter uses the same model per hour (100% / 5h = 20%/h).
+Weekly colours follow **Today** only, because today's allowance is already
+recalculated from what is left (past overspend is priced in):
+
+| Today vs allowance | Bar, badge, tray |
+|---|---|
+| under 70% | 🟢 green · *On pace* |
+| 70–100% | 🟠 orange · *Near today's limit* |
+| over 100% | 🔴 red · *Too much today* |
+
+The **Avg** line is informational: orange when the week is ahead of pace, it
+does not change the colour. Not using Claude brings it back down by itself.
+Toggle: Display → *Red badge when over daily pace*. The 5-hour Session meter
+uses the pace model per hour (100% / 5h = 20%/h) and turns red when over pace.
 
 "Today" starts at the first reading of the day, so on the day you install it
 only counts from that moment.
@@ -132,7 +142,7 @@ npm start
 ## Build
 
 ```bash
-npm test          # 21 tests: parse, forecast, pace, context
+npm test          # 23 tests: parse, forecast, pace, context
 npm run dist:win  # NSIS installer
 npm run dist:mac  # DMG (arm64 + x64)
 ```
@@ -196,6 +206,7 @@ updates; your login stays on your PC.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.3.1** — Weekly colour follows today vs allowance (orange from 70%, red over), Avg line informational; lighter polling (context file cached, tray badge redrawn only on change, resets_at jitter ignored).
 - **1.3.0** — Open Claude Desktop shortcut, About dialog, Fable limit detected, Electron 45, greyed-out unreported limits.
 - **1.2.2** — Midnight resets shown as 23:59 of the last day, with the day name.
 - **1.2.1** — Lighter: usage is read straight from the API (no hidden claude.ai page; window only for sign-in or as fallback), closed gauge is freed.
