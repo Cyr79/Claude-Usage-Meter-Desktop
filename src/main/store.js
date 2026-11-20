@@ -79,6 +79,8 @@ class Store {
   }
 
   set(key, value) {
+    // Polls re-set the same values; don't rewrite the file for nothing.
+    if (JSON.stringify(this.data[key]) === JSON.stringify(value)) return;
     this.data[key] = value;
     this.save();
   }

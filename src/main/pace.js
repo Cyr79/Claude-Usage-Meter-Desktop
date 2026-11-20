@@ -35,7 +35,8 @@ function updateBaseline(baselines, meter, now = Date.now() / 1000) {
   const reset = b && meter.resetsAt && b.resetsAt && meter.resetsAt - b.resetsAt >= 1800;
   if (!b || b.day !== day || reset || meter.pct < b.pct) {
     baselines[meter.key] = { day, pct: meter.pct, at: now, resetsAt: meter.resetsAt };
-  } else if (meter.resetsAt) {
+  } else if (meter.resetsAt && Math.abs(meter.resetsAt - (b.resetsAt || 0)) >= 60) {
+    // resets_at jitters by under a second per poll; ignore that noise.
     b.resetsAt = meter.resetsAt;
   }
   return baselines;
