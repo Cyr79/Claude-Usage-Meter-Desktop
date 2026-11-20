@@ -601,7 +601,10 @@ function renderWindowsTrays(stale, menu) {
     let role = stale
       ? 'stale'
       : severity(meter.pct, store.get('warnAt'), store.get('dangerAt'));
-    if (!stale && p && p.hot && store.get('paceColours') !== false) role = 'danger';
+    if (!stale && p && store.get('paceColours') !== false) {
+      if (p.hot) role = 'danger';
+      else if (p.warn && role !== 'danger') role = 'warn';
+    }
     // Redraw the badge only when its number or colour changed.
     const look = `${Math.round(meter.pct)}|${role}`;
     let meterTray = meterTrays.get(meter.key);

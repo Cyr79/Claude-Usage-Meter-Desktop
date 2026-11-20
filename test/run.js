@@ -148,6 +148,25 @@ test('today burn vs remaining-budget allowance', () => {
   assert.strictEqual(p.hot, true);
 });
 
+test('weekly stays green when today is low, even slightly over avg pace', () => {
+  const t = 1793750000;
+  const day = require('../src/main/pace').localDay(t);
+  // 38% used, ~2.5 days in (expected ~35.7, +2.3 pts), today only +3 of ~13.9
+  const p = pace({ key: 'weekly', pct: 38, resetsAt: t + 4.5 * DAY }, { day, pct: 35, at: t - 3600 }, t);
+  assert.strictEqual(p.overPace, true);
+  assert.strictEqual(p.level, 'ok');
+});
+
+test('weekly turns orange near today allowance, red over it', () => {
+  const t = 1793750000;
+  const day = require('../src/main/pace').localDay(t);
+  const b = { day, pct: 30, at: t - 3600 };
+  const r = t + 5 * DAY;              // allowance = 70/5 = 14
+  assert.strictEqual(pace({ key: 'weekly', pct: 39, resetsAt: r }, b, t).level, 'ok');   // +9
+  assert.strictEqual(pace({ key: 'weekly', pct: 40, resetsAt: r }, b, t).level, 'warn'); // +10 >= 9.8
+  assert.strictEqual(pace({ key: 'weekly', pct: 45, resetsAt: r }, b, t).level, 'hot');  // +15 > 14
+});
+
 test('reset restarts the day baseline', () => {
   const t = 1793750000;
   const b = {};

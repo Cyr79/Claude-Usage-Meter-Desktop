@@ -18,6 +18,8 @@ const WINDOWS = {
 };
 // Small slack so 1% after 10 minutes doesn't flash red.
 const SLACK_PTS = 2;
+// Daily windows: orange once today reaches this share of today's allowance.
+const WARN_FRAC = 0.7;
 
 function localDay(ts) {
   const d = new Date(ts * 1000);
@@ -71,6 +73,13 @@ function pace(meter, baseline, now = Date.now() / 1000) {
     todayOver = today > allowance;
   }
 
+  // Daily windows: colour follows today vs allowance only. The allowance is
+  // already recomputed from what is left, so past overspend is priced in.
+  // Avg over pace stays informational. No baseline yet -> fall back to pace.
+  const byToday = today !== null;
+  const hot = byToday ? todayOver : overPace;
+  const warn = !hot && byToday && today >= WARN_FRAC * allowance;
+
   return {
     unit: win.unit,
     target,
@@ -86,7 +95,9 @@ function pace(meter, baseline, now = Date.now() / 1000) {
     todaySince,
     todayOver,
     allowance,
-    hot: overPace || todayOver,
+    hot,
+    warn,
+    level: hot ? 'hot' : warn ? 'warn' : 'ok',
   };
 }
 
@@ -115,7 +126,7 @@ function paceLines(p) {
       + ` (${p.delta >= 0 ? '+' : ''}${f1(p.delta)} pts vs pace)`,
   ];
   if (p.today !== null) {
-    lines.push(`${p.todayOver ? '🔴' : '🟢'} Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% (100/7 = ${f1(p.target)}%)`);
+    lines.push(`${p.todayOver ? '🔴' : p.warn ? '🟠' : '🟢'} Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% (100/7 = ${f1(p.target)}%)`);
   }
   if (p.budget !== null) {
     lines.push(leftLine(p));
@@ -128,7 +139,7 @@ function tipLines(p) {
   if (!p) return [];
   const u = p.unit === 'day' ? 'd' : 'h';
   const lines = [`${p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} · target ${f1(p.target)}`];
-  if (p.today !== null) lines.push(`${p.todayOver ? '🔴' : '🟢'} Today +${f1(p.today)}% (max ${f1(p.allowance)})`);
+  if (p.today !== null) lines.push(`${p.todayOver ? '🔴' : p.warn ? '🟠' : '🟢'} Today +${f1(p.today)}% (max ${f1(p.allowance)})`);
   if (p.budget !== null) {
     const rate = p.unit === 'day' && p.leftUnits >= 1 ? ` (${f1(p.budget)}%/d)` : '';
     lines.push(`Left ${f1(p.leftPct)}% · ${p.leftText}${rate}`);
@@ -136,4 +147,4 @@ function tipLines(p) {
   return lines;
 }
 
-module.exports = { leftLine, pace, paceLines, tipLines, updateBaseline, localDay, WINDOWS };
+module.exports = { WARN_FRAC, leftLine, pace, paceLines, tipLines, updateBaseline, localDay, WINDOWS };

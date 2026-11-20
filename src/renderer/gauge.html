@@ -6,7 +6,7 @@
 <title>Claude Usage Meter</title>
 <style>
   :root { --bg: rgba(22,22,28,.96); --fg: #f2f2f4; --mut: #9a9aa6; --track: rgba(255,255,255,.09);
-          --red: #ff453a; --green: #32d74b; --line: rgba(255,255,255,.08); }
+          --red: #ff453a; --green: #32d74b; --orange: #ff9f0a; --line: rgba(255,255,255,.08); }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: transparent; }
   body { font: 12px/1.35 "Segoe UI", system-ui, sans-serif; color: var(--fg); user-select: none; }
@@ -36,8 +36,10 @@
   .pace { margin-top: 3px; font-variant-numeric: tabular-nums; }
   .hot { color: var(--red); }
   .ok { color: var(--green); }
+  .warn { color: var(--orange); }
   .badge { display: inline-block; font-size: 10.5px; padding: 1px 6px; border-radius: 5px; margin-left: 6px; font-weight: 600; }
   .badge.hot { background: rgba(255,69,58,.18); border: 1px solid rgba(255,69,58,.35); }
+  .badge.warn { background: rgba(255,159,10,.16); border: 1px solid rgba(255,159,10,.35); }
   .badge.ok { background: rgba(50,215,75,.14); border: 1px solid rgba(50,215,75,.3); }
   footer { display: flex; justify-content: space-between; color: var(--mut); font-size: 10.5px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
   .empty { color: var(--mut); padding: 10px 0; }
@@ -54,14 +56,16 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const f1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
   // Green -> amber -> red as it fills; forced red when over pace.
-  function colour(pct, hot) {
+  function colour(pct, hot, level) {
     if (hot || pct >= 90) return 'linear-gradient(90deg,#ff9f0a,#ff453a)';
+    if (level === 'warn') return 'linear-gradient(90deg,#ffd60a,#ff9f0a)';
+    if (level === 'ok') return 'linear-gradient(90deg,hsl(180 85% 50%),hsl(140 85% 50%))';
     const hue = Math.round(140 - Math.min(1, pct / 90) * 110);
     return `linear-gradient(90deg,hsl(${Math.min(190, hue + 40)} 85% 50%),hsl(${hue} 85% 50%))`;
   }
-  function bar(pct, hot, tick) {
+  function bar(pct, hot, tick, level) {
     const t = tick == null ? '' : `<div class="tick" style="left:calc(${Math.min(99.4, tick)}% - 1px)"></div>`;
-    return `<div class="track"><div class="fill${pct >= 95 ? ' full' : ''}" style="width:${pct}%;background:${colour(pct, hot)}"></div>${t}</div>`;
+    return `<div class="track"><div class="fill${pct >= 95 ? ' full' : ''}" style="width:${pct}%;background:${colour(pct, hot, level)}"></div>${t}</div>`;
   }
   function kTok(n) { return n >= 1e6 ? f1(n / 1e6) + 'M' : Math.round(n / 1000) + 'k'; }
 
@@ -69,14 +73,14 @@
     const p = m.pace;
     const u = p ? p.unit : '';
     let html = `<div class="m"><div class="row"><span class="name">${esc(m.label)}`;
-    if (p) html += `<span class="badge ${p.hot ? 'hot' : 'ok'}">${p.overPace ? 'Over pace' : p.todayOver ? 'Too much today' : 'On pace'}</span>`;
-    html += `</span><span class="pct ${p && p.hot ? 'hot' : ''}">${Math.round(m.pct)}%</span></div>`;
-    html += bar(m.pct, p && p.hot, p ? p.expected : null);
+    if (p) html += `<span class="badge ${p.level}">${p.todayOver ? 'Too much today' : p.warn ? 'Near today\'s limit' : p.hot ? 'Over pace' : 'On pace'}</span>`;
+    html += `</span><span class="pct ${p && p.level !== 'ok' ? p.level : ''}">${Math.round(m.pct)}%</span></div>`;
+    html += bar(m.pct, p && p.hot, p ? p.expected : null, p ? p.level : null);
     html += `<div class="sub">Resets ${esc(m.resetText)}${m.forecast ? ' · ' + esc(m.forecast) : ''}</div>`;
     if (p) {
-      html += `<div class="pace ${p.overPace ? 'hot' : 'ok'}">Avg ${f1(p.avg)}%/${u} vs target ${f1(p.target)}%/${u} · ${p.delta >= 0 ? '+' : ''}${f1(p.delta)} pts</div>`;
+      html += `<div class="pace ${!p.overPace ? 'ok' : p.today !== null ? 'warn' : 'hot'}">Avg ${f1(p.avg)}%/${u} vs target ${f1(p.target)}%/${u} · ${p.delta >= 0 ? '+' : ''}${f1(p.delta)} pts</div>`;
       if (p.today !== null) {
-        html += `<div class="pace ${p.todayOver ? 'hot' : 'ok'}">Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% <span class="sub">(100/7 = ${f1(p.target)}%)</span>`
+        html += `<div class="pace ${p.level}">Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% <span class="sub">(100/7 = ${f1(p.target)}%)</span>`
           + (p.todaySince ? ` <span class="sub">since ${new Date(p.todaySince * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` : '') + '</div>';
       }
       if (p.budget !== null) {
