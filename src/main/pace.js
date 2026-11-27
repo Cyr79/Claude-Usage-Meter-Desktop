@@ -18,6 +18,10 @@ const WINDOWS = {
 };
 // Small slack so 1% after 10 minutes doesn't flash red.
 const SLACK_PTS = 2;
+// Hourly windows (session): one prompt can jump several %, so the colour
+// needs a wide band. Orange from +10 pts ahead of pace, red from +20.
+const SESSION_WARN_PTS = 10;
+const SESSION_HOT_PTS = 20;
 // Daily windows: orange once today reaches this share of today's allowance.
 const WARN_FRAC = 0.7;
 
@@ -77,8 +81,10 @@ function pace(meter, baseline, now = Date.now() / 1000) {
   // already recomputed from what is left, so past overspend is priced in.
   // Avg over pace stays informational. No baseline yet -> fall back to pace.
   const byToday = today !== null;
-  const hot = byToday ? todayOver : overPace;
-  const warn = !hot && byToday && today >= WARN_FRAC * allowance;
+  const ahead = meter.pct - expected;
+  const hourly = win.unit === 'h';
+  const hot = byToday ? todayOver : hourly ? ahead > SESSION_HOT_PTS : overPace;
+  const warn = !hot && (byToday ? today >= WARN_FRAC * allowance : hourly && ahead > SESSION_WARN_PTS);
 
   return {
     unit: win.unit,
@@ -122,7 +128,7 @@ function paceLines(p) {
   if (!p) return [];
   const u = p.unit;
   const lines = [
-    `${p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} vs target ${f1(p.target)}%/${u}`
+    `${p.unit === 'h' ? (p.hot ? '🔴' : p.warn ? '🟠' : '🟢') : p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} vs target ${f1(p.target)}%/${u}`
       + ` (${p.delta >= 0 ? '+' : ''}${f1(p.delta)} pts vs pace)`,
   ];
   if (p.today !== null) {
@@ -138,7 +144,7 @@ function paceLines(p) {
 function tipLines(p) {
   if (!p) return [];
   const u = p.unit === 'day' ? 'd' : 'h';
-  const lines = [`${p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} · target ${f1(p.target)}`];
+  const lines = [`${p.unit === 'h' ? (p.hot ? '🔴' : p.warn ? '🟠' : '🟢') : p.overPace ? '🔴' : '🟢'} Avg ${f1(p.avg)}%/${u} · target ${f1(p.target)}`];
   if (p.today !== null) lines.push(`${p.todayOver ? '🔴' : p.warn ? '🟠' : '🟢'} Today +${f1(p.today)}% (max ${f1(p.allowance)})`);
   if (p.budget !== null) {
     const rate = p.unit === 'day' && p.leftUnits >= 1 ? ` (${f1(p.budget)}%/d)` : '';

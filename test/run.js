@@ -183,6 +183,14 @@ test('session window paces per hour (20%/h)', () => {
   assert.strictEqual(p.overPace, true);
 });
 
+test('session: wide band, orange from +10 pts, red from +20', () => {
+  const t = 1793750000;
+  const r = t + 4.5 * 3600;           // 30 min in, expected 10%
+  assert.strictEqual(pace({ key: 'session', pct: 6, resetsAt: r }, null, t).level, 'ok');
+  assert.strictEqual(pace({ key: 'session', pct: 25, resetsAt: r }, null, t).level, 'warn');
+  assert.strictEqual(pace({ key: 'session', pct: 31, resetsAt: r }, null, t).level, 'hot');
+});
+
 test('tooltip lines fit Windows 127-char limit with header', () => {
   const t = 1793750000;
   const p = pace({ key: 'weekly', pct: 87, resetsAt: t + 0.35 * DAY }, { day: require('../src/main/pace').localDay(t), pct: 70, at: t - 3600 }, t);

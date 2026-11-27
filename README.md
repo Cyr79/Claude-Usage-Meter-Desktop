@@ -9,12 +9,12 @@ macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 ```
 
 <p>
-  <img src="docs/energy-gauge-1.4.png" width="286" alt="Energy gauge 1.4: day and hour markers on Windows 11">
+  <img src="docs/energy-gauge-1.4.1.png" width="306" alt="Energy gauge 1.4.1: weekly bar split by usage and budget, hover tooltip">
   &nbsp;
   <img src="docs/tray-tooltip.png" width="300" alt="Tray badges and Fable pace tooltip">
 </p>
 
-<sub>Left: the energy gauge, pinned, on Windows 11 (v1.4). Right: tray badges
+<sub>Left: the energy gauge, pinned, on Windows 11 (v1.4.1), hovering today's part of the Weekly bar. Right: tray badges
 (Fable 16, Weekly 77, Session 64) and the pace tooltip of the Fable badge.</sub>
 
 ## Features
@@ -36,9 +36,18 @@ ahead of pace. **Right-click** opens the menu.
 you click elsewhere, can be dragged by its title anywhere, and comes back at the
 same spot when the app starts. Click 📌 again or ✕ to unpin.
 
-### 🗓️ Day and hour markers, compact gauge (new in 1.4)
-- **Weekly bar** split in 7 equal parts (100% / 7 = 14.3% per day), with the
-  day names above it. Today is in white.
+### 🗓️ Day and hour markers, compact gauge (new in 1.4, updated in 1.4.1)
+- **Weekly bar split by usage (1.4.1):** each past day is as wide as what it
+  really used, today is as wide as today's budget (between two white marks),
+  and what is left is shared evenly over the coming days. Use less today and
+  the next days grow. Past usage is shaded darker. Days with no reading yet
+  merge into the next one (e.g. `mer.+jeu.`); the day log starts when you
+  install 1.4.1.
+- **Hover a part of the Weekly bar:** `ven.: 15.0% used of 16.3% budget`
+  (today), `mer.+jeu.: 24.0% of the week used` (past), `sam.: 14.9% budget`
+  (coming). Native tooltips, no mouse handlers: no CPU while the gauge is open.
+- **Session colours are wider:** green up to +10 pts ahead of pace, orange
+  ("Ahead of pace") up to +20, red above. One prompt can jump several %.
 - **Session bar** split in 5 parts, one per hour, with the start time of each
   hour above it.
 - **One line per limit:** Session shows `Resets in 4h 34m`; Weekly shows
@@ -156,7 +165,7 @@ npm start
 ## Build
 
 ```bash
-npm test          # 23 tests: parse, forecast, pace, context
+npm test          # 24 tests: parse, forecast, pace, context
 npm run dist:win  # NSIS installer
 npm run dist:mac  # DMG (arm64 + x64)
 ```
@@ -220,6 +229,7 @@ updates; your login stays on your PC.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.4.1** — Weekly bar split by usage (past days = real use, today = budget, rest shared), hover tooltips per part, per-day log, wider Session colour band (orange +10, red +20 pts), day names follow the Windows display language.
 - **1.4.0** — Weekly bar split in 7 days and Session bar in 5 hours, with labels; compact gauge (one line per limit, details in a `…` tooltip); "budget" wording; window fits its content; gauge no longer invisible on some PCs (solid background) and no longer closes right after opening from the tray.
 - **1.3.1** — Weekly colour follows today vs allowance (orange from 70%, red over), Avg line informational; lighter polling (context file cached, tray badge redrawn only on change, resets_at jitter ignored).
 - **1.3.0** — Open Claude Desktop shortcut, About dialog, Fable limit detected, Electron 45, greyed-out unreported limits.

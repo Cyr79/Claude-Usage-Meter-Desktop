@@ -36,6 +36,13 @@
   .dnames span.now { color: var(--fg); font-weight: 600; }
   .more { cursor: help; color: var(--mut); margin-left: 6px; padding: 0 4px; border-radius: 4px; user-select: none; }
   .more:hover { color: var(--fg); background: var(--track); }
+  .snames { position: relative; height: 13px; font-size: 9.5px; color: var(--mut); margin-bottom: 2px; }
+  .snames span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .snames span.now { color: var(--fg); font-weight: 600; }
+  .past { position: absolute; top: 0; bottom: 0; left: 0; background: rgba(0,0,0,.35); }
+  .hseg { position: absolute; top: 0; bottom: 0; z-index: 2; }
+  .hseg:hover { background: rgba(255,255,255,.12); }
+  .dtick.now { background: rgba(255,255,255,.75); }
   .dtick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.22); }
   @keyframes alarm { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
   .sub { color: var(--mut); margin-top: 3px; }
@@ -87,6 +94,31 @@
     }
     return h + '</div>';
   }
+  // Weekly split by usage: past days = real use, today = budget, rest shared.
+  // Day names in the gauge's locale (same as the Session hours).
+  const segLabel = (s) => s.days.map((ts) => new Date(ts * 1000).toLocaleDateString([], { weekday: 'short' })).join('+');
+  function usageNames(segs) {
+    return '<div class="snames">' + segs.map((s) => s.to - s.from < 7 ? ''
+      : `<span class="${s.kind === 'today' ? 'now' : ''}" style="left:${((s.from + s.to) / 2).toFixed(2)}%">${esc(segLabel(s))}</span>`).join('') + '</div>';
+  }
+  function usageBar(m) {
+    const p = m.pace;
+    const today = m.segs.find((s) => s.kind === 'today');
+    let t = `<div class="past" style="width:${Math.min(m.pct, today.from).toFixed(2)}%"></div>`;
+    for (const s of m.segs.slice(1)) {
+      const now = s.kind === 'today' || (s.from === today.to && s.kind === 'future');
+      t += `<div class="dtick${now ? ' now' : ''}" style="left:${Math.min(99.6, s.from).toFixed(2)}%"></div>`;
+    }
+    // Hover zones: native tooltips, no mouse handlers (no CPU while idle).
+    for (const s of m.segs) {
+      const w = s.to - s.from;
+      const tip = s.kind === 'past' ? `${segLabel(s)}: ${f1(w)}% of the week used`
+        : s.kind === 'today' ? `${segLabel(s)}: ${f1(Math.max(0, m.pct - s.from))}% used of ${f1(w)}% budget`
+        : `${segLabel(s)}: ${f1(w)}% budget`;
+      t += `<div class="hseg" style="left:${s.from.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(tip)}"></div>`;
+    }
+    return `<div class="track"><div class="fill${m.pct >= 95 ? ' full' : ''}" style="width:${m.pct}%;background:${colour(m.pct, p.hot, p.level)}"></div>${t}</div>`;
+  }
   // Plain lines for the "…" tooltip.
   function details(m) {
     const p = m.pace;
@@ -102,6 +134,7 @@
     if (p.budget !== null) {
       out.push(`Left: ${f1(p.leftPct)}% for ${p.leftText}${u === 'day' && p.leftUnits >= 1 ? ' → ~' + f1(p.budget) + '%/day' : ''}`);
     }
+    if (m.segs) out.push('Days: ' + m.segs.map((s) => `${segLabel(s)} ${f1(s.to - s.from)}%`).join(' · '));
     if (m.forecast) out.push(m.forecast);
     return out;
   }
@@ -112,11 +145,15 @@
     const p = m.pace;
     const u = p ? p.unit : '';
     let html = `<div class="m"><div class="row"><span class="name">${esc(m.label)}`;
-    if (p) html += `<span class="badge ${p.level}">${p.todayOver ? 'Too much today' : p.warn ? 'Near today\'s limit' : p.hot ? 'Over pace' : 'On pace'}</span>`;
+    if (p) html += `<span class="badge ${p.level}">${p.todayOver ? 'Too much today' : p.warn ? (p.today !== null ? 'Near today\'s limit' : 'Ahead of pace') : p.hot ? 'Over pace' : 'On pace'}</span>`;
     html += `</span><span class="pct ${p && p.level !== 'ok' ? p.level : ''}">${Math.round(m.pct)}%</span></div>`;
-    const segs = p && m.resetsAt ? (p.unit === 'day' ? [7, 86400] : [5, 3600]) : null;
-    if (segs) html += segNames(m.resetsAt, segs[0], segs[1]);
-    html += bar(m.pct, p && p.hot, p ? p.expected : null, p ? p.level : null, segs ? segs[0] : 0);
+    if (m.segs) {
+      html += usageNames(m.segs) + usageBar(m);
+    } else {
+      const segs = p && m.resetsAt ? (p.unit === 'day' ? [7, 86400] : [5, 3600]) : null;
+      if (segs) html += segNames(m.resetsAt, segs[0], segs[1]);
+      html += bar(m.pct, p && p.hot, p ? p.expected : null, p ? p.level : null, segs ? segs[0] : 0);
+    }
     // Compact: one key line. Hover "…" for details (tooltip).
     const dots = `<span class="more" title="${esc(details(m).join('\n'))}">…</span>`;
     if (p && p.today !== null) {

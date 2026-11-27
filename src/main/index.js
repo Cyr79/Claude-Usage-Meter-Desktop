@@ -15,6 +15,7 @@ const { macTitle, tooltip, iconState, severity, chosenMeters, STYLE_PREVIEWS } =
 const { renderBadge } = require('./trayicon');
 const { pace, paceLines, tipLines, updateBaseline } = require('./pace');
 const { readContext } = require('./context');
+const { updateDayLog, weekSegments } = require('./daylog');
 
 const IS_MAC = process.platform === 'darwin';
 const STALE_AFTER = 15 * 60 * 1000;
@@ -131,6 +132,10 @@ function applyResult(raw) {
   const baselines = { ...(store.get('dayBaselines') || {}) };
   for (const meter of meters) updateBaseline(baselines, meter, now);
   store.set('dayBaselines', baselines);
+
+  const dayLogs = { ...(store.get('dayLogs') || {}) };
+  for (const meter of meters) updateDayLog(dayLogs, meter, now);
+  store.set('dayLogs', dayLogs);
 
   state.meters = meters;
   state.lastOkAt = Date.now();
@@ -399,6 +404,7 @@ function gaugeData() {
       forecast: forecast(meter.pct, state.histories.get(meter.key) || new History(), meter.resetsAt),
       pace: meterPace(meter),
       resetsAt: meter.resetsAt,
+      segs: weekSegments(meter, meterPace(meter), (store.get('dayLogs') || {})[meter.key]),
     })),
   };
 }

@@ -26,6 +26,7 @@ const DEFAULTS = {
   // Badge turns red when usage runs ahead of 100%/window (e.g. 14.3%/day).
   paceColours: true,
   dayBaselines: {},
+  dayLogs: {},
   // Live context fill of the active Claude Code session (~/.claude/projects).
   showContext: true,
   contextBadge: true,
