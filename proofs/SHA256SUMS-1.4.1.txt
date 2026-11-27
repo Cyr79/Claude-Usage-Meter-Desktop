@@ -1,0 +1,3 @@
+3b93d4af5cf79d6dd6685aad0ab8e24f112ff87f4ac17a5cf7c8a6526c3bf4ee  Claude-Usage-Meter-Setup-1.4.1.exe
+282ebcc45c8cdf48224e995ea06ac3e5d2053e774dba0c61e9be1883dad2ba11  Claude-Usage-Meter-Setup-1.4.1.exe.blockmap
+0a17a3a8a54d191414d7b18d83639f49af3d9cad7276264586707af335acc461  latest.yml
