@@ -1,11 +1,15 @@
 # Claude Usage Meter — Desktop
 
-Your Claude.ai usage limits in the Windows system tray (and the macOS menu bar),
-with a daily pace check and a live context meter for Claude Code.
+Your Claude.ai usage limits in the Windows system tray, with a daily pace check
+and a live context meter for Claude Code.
+
+> **Windows only.** Releases ship a Windows installer (x64 / arm64). The code
+> still runs on macOS (menu bar text), but no macOS build is published or tested:
+> build it yourself with `npm run dist:mac` on a Mac.
 
 ```
 Windows   numbered tray badges · hover for pace · click for the energy gauge
-macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
+macOS     S: 42%  W: 18%  F: 7%   (menu bar text, build from source only)
 ```
 
 <p>
@@ -149,9 +153,13 @@ Display → *Claude Code context gauge* toggles it; *Context window size* forces
 1. Download `Claude Usage Meter Setup x.y.z.exe` from
    [Releases](https://github.com/Cyr79/Claude-Usage-Meter-Desktop/releases).
 2. Quit the running meter (right-click a badge → Quit).
-3. Run the installer. The build is unsigned, so SmartScreen may warn:
-   *More info → Run anyway*. Settings and sign-in are kept.
-4. Sign in once when the window opens. It then hides and polls in the background.
+3. Run the installer. The `.exe` has no Authenticode code-signing certificate,
+   so SmartScreen may warn: *More info → Run anyway*. Settings and sign-in are
+   kept.
+4. Optional, check the file: compare `Get-FileHash <file> -Algorithm SHA256`
+   with `SHA256SUMS.txt` in the release. That list is timestamped on Bitcoin
+   (`SHA256SUMS.txt.ots`, OpenTimestamps), and commits and tags are signed.
+5. Sign in once when the window opens. It then hides and polls in the background.
 
 Badges hidden? Click the **^** arrow next to the clock and drag them onto the taskbar.
 
