@@ -37,6 +37,7 @@ let fetcher = null;
 let pollTimer = null;
 let gauge = null;
 let gaugeHiddenAt = 0;
+let gaugeShownAt = 0;
 let contextTray = null;
 let lastContextKey = '';
 let lastIconState = null;
@@ -397,6 +398,7 @@ function gaugeData() {
       resetText: meter.resetsAt ? resetText(meter) : 'unknown',
       forecast: forecast(meter.pct, state.histories.get(meter.key) || new History(), meter.resetsAt),
       pace: meterPace(meter),
+      resetsAt: meter.resetsAt,
     })),
   };
 }
@@ -404,19 +406,21 @@ function gaugeData() {
 function pushGauge() {
   if (gauge && !gauge.isDestroyed() && gauge.isVisible()) {
     gauge.webContents.send('gauge:data', gaugeData());
-    // Pinned gauge is live: content height changes (context bar appears etc.).
-    if (store.get('gaugePinned')) fitGauge();
+    // Content height changes (context bar, data arriving): fit every push.
+    fitGauge();
   }
 }
 
 function createGauge() {
   gauge = new BrowserWindow({
-    width: 360,
+    width: 270,
     height: 420,
     show: false,
     frame: false,
     resizable: false,
-    transparent: true,
+    // No transparency: with hardware acceleration off, a transparent window
+    // can stay invisible on Windows. Solid background = same card colour.
+    backgroundColor: '#16161c',
     skipTaskbar: true,
     alwaysOnTop: true,
     fullscreenable: false,
@@ -429,7 +433,11 @@ function createGauge() {
   });
   if (store.get('gaugePinned')) gauge.setAlwaysOnTop(true, 'screen-saver');
   gauge.loadFile(path.join(__dirname, '..', 'renderer', 'gauge.html'));
-  gauge.on('blur', () => { if (!store.get('gaugePinned')) closeGauge(); });
+  // Tray menu closes just after show() and steals focus: ignore that first blur.
+  gauge.on('blur', () => {
+    if (store.get('gaugePinned') || Date.now() - gaugeShownAt < 500) return;
+    closeGauge();
+  });
   gauge.on('closed', () => { gauge = null; });
   gauge.webContents.on('did-finish-load', () => { fitGauge(); pushGauge(); });
   gauge.on('moved', () => {
@@ -462,8 +470,12 @@ function fitGauge() {
   gauge.webContents.executeJavaScript('document.querySelector(".card").getBoundingClientRect().height')
     .then((h) => {
       if (!gauge || gauge.isDestroyed()) return;
-      const [w] = gauge.getSize();
-      gauge.setSize(w, Math.min(720, Math.ceil(h) + 2));
+      // Windows ignores setSize on a non-resizable window: unlock briefly.
+      const [w] = gauge.getContentSize();
+      gauge.setResizable(true);
+      gauge.setMinimumSize(1, 1);
+      gauge.setContentSize(w, Math.min(720, Math.ceil(h)));
+      gauge.setResizable(false);
       placeGauge();
     })
     .catch(() => {});
@@ -495,6 +507,7 @@ function placeGauge() {
 function showGauge() {
   if (!gauge || gauge.isDestroyed()) createGauge();
   placeGauge();
+  gaugeShownAt = Date.now();
   // Pinned (incl. at startup): appear without stealing focus from your work.
   if (store.get('gaugePinned')) gauge.showInactive();
   else { gauge.show(); gauge.focus(); }
@@ -700,6 +713,7 @@ app.whenReady().then(() => {
   if (!IS_MAC) tray.on('click', toggleGauge);
   ipcMain.on('gauge:refresh', () => { poll(); pollContext(true); });
   ipcMain.on('gauge:hide', () => { if (store.get('gaugePinned')) setPinned(false); closeGauge(); });
+  ipcMain.on('gauge:fit', () => { if (gauge && !gauge.isDestroyed()) fitGauge(); });
   ipcMain.on('gauge:pin', () => setPinned(!store.get('gaugePinned')));
   ipcMain.on('gauge:claude', openClaudeDesktop);
   if (store.get('gaugePinned')) setTimeout(showGauge, 1500);

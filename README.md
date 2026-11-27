@@ -9,12 +9,12 @@ macOS     S: 42%  W: 18%  F: 7%   (text in the menu bar)
 ```
 
 <p>
-  <img src="docs/energy-gauge-real.png" width="360" alt="Energy gauge popup on Windows 11">
+  <img src="docs/energy-gauge-1.4.png" width="286" alt="Energy gauge 1.4: day and hour markers on Windows 11">
   &nbsp;
   <img src="docs/tray-tooltip.png" width="300" alt="Tray badges and Fable pace tooltip">
 </p>
 
-<sub>Left: the energy gauge, pinned, on Windows 11 (v1.3). Right: tray badges
+<sub>Left: the energy gauge, pinned, on Windows 11 (v1.4). Right: tray badges
 (Fable 16, Weekly 77, Session 64) and the pace tooltip of the Fable badge.</sub>
 
 ## Features
@@ -35,6 +35,20 @@ ahead of pace. **Right-click** opens the menu.
 *Keep gauge on screen*. The gauge then stays always on top, doesn't close when
 you click elsewhere, can be dragged by its title anywhere, and comes back at the
 same spot when the app starts. Click 📌 again or ✕ to unpin.
+
+### 🗓️ Day and hour markers, compact gauge (new in 1.4)
+- **Weekly bar** split in 7 equal parts (100% / 7 = 14.3% per day), with the
+  day names above it. Today is in white.
+- **Session bar** split in 5 parts, one per hour, with the start time of each
+  hour above it.
+- **One line per limit:** Session shows `Resets in 4h 34m`; Weekly shows
+  `Resets 2 déc.` and `Used 9.0% of 16.3% budget today`.
+- **Hover `…`** for the details: reset time, used vs where you should be,
+  today's budget, average vs target, what is left per day.
+- **Smaller window** (270 px wide) that fits its content, with no empty space.
+
+The daily **budget** is a fair share, not a hard limit: (100% − used) ÷ days
+left. Go over it one day and the next days get a smaller budget.
 
 ### ✳ Open Claude Desktop, About, Fable (new in 1.3)
 - **Open Claude Desktop:** right-click a badge → *Open Claude Desktop*, or the
@@ -206,6 +220,7 @@ updates; your login stays on your PC.
 - **~150 MB installed** — that's Chromium.
 
 ## Changelog
+- **1.4.0** — Weekly bar split in 7 days and Session bar in 5 hours, with labels; compact gauge (one line per limit, details in a `…` tooltip); "budget" wording; window fits its content; gauge no longer invisible on some PCs (solid background) and no longer closes right after opening from the tray.
 - **1.3.1** — Weekly colour follows today vs allowance (orange from 70%, red over), Avg line informational; lighter polling (context file cached, tray badge redrawn only on change, resets_at jitter ignored).
 - **1.3.0** — Open Claude Desktop shortcut, About dialog, Fable limit detected, Electron 45, greyed-out unreported limits.
 - **1.2.2** — Midnight resets shown as 23:59 of the last day, with the day name.

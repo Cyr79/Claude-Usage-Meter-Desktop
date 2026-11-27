@@ -5,34 +5,40 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
 <title>Claude Usage Meter</title>
 <style>
-  :root { --bg: rgba(22,22,28,.96); --fg: #f2f2f4; --mut: #9a9aa6; --track: rgba(255,255,255,.09);
+  :root { --bg: #16161c; --fg: #f2f2f4; --mut: #9a9aa6; --track: rgba(255,255,255,.09);
           --red: #ff453a; --green: #32d74b; --orange: #ff9f0a; --line: rgba(255,255,255,.08); }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: transparent; }
   body { font: 12px/1.35 "Segoe UI", system-ui, sans-serif; color: var(--fg); user-select: none; }
-  .card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: 0; padding: 8px 10px 6px; }
   header { -webkit-app-region: drag; cursor: move; }
   header button { -webkit-app-region: no-drag; }
   header button.on { color: #ff9f0a; }
-  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
   header b { font-size: 13px; }
   header button { background: none; border: 0; color: var(--mut); cursor: pointer; font-size: 13px; padding: 2px 4px; }
   header button:hover { color: var(--fg); }
-  .m { padding: 8px 0; border-top: 1px solid var(--line); }
+  .m { padding: 5px 0; border-top: 1px solid var(--line); }
   .m:first-of-type { border-top: 0; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
   .row .name { font-weight: 600; }
   .row .pct { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
-  .track { position: relative; height: 14px; border-radius: 7px; background: var(--track); overflow: hidden; }
-  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 7px; transition: width .6s ease, background .4s ease; }
+  .track { position: relative; height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; transition: width .6s ease, background .4s ease; }
   .fill::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 18px;
                  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.4)); }
   /* Only a nearly full bar animates, and only opacity (cheap). An endless glow
      on every bar kept a pinned gauge repainting: ~4-12% of a core measured. */
   .fill.full { animation: alarm 1.2s infinite ease-in-out; }
   .tick { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #fff; opacity: .85; border-radius: 1px; }
+  .dnames { display: flex; font-size: 9.5px; color: var(--mut); margin-bottom: 2px; }
+  .dnames span { flex: 1; text-align: center; }
+  .dnames span.now { color: var(--fg); font-weight: 600; }
+  .more { cursor: help; color: var(--mut); margin-left: 6px; padding: 0 4px; border-radius: 4px; user-select: none; }
+  .more:hover { color: var(--fg); background: var(--track); }
+  .dtick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.22); }
   @keyframes alarm { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
-  .sub { color: var(--mut); margin-top: 5px; }
+  .sub { color: var(--mut); margin-top: 3px; }
   .pace { margin-top: 3px; font-variant-numeric: tabular-nums; }
   .hot { color: var(--red); }
   .ok { color: var(--green); }
@@ -41,7 +47,7 @@
   .badge.hot { background: rgba(255,69,58,.18); border: 1px solid rgba(255,69,58,.35); }
   .badge.warn { background: rgba(255,159,10,.16); border: 1px solid rgba(255,159,10,.35); }
   .badge.ok { background: rgba(50,215,75,.14); border: 1px solid rgba(50,215,75,.3); }
-  footer { display: flex; justify-content: space-between; color: var(--mut); font-size: 10.5px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+  footer { display: flex; justify-content: space-between; color: var(--mut); font-size: 10.5px; margin-top: 3px; padding-top: 4px; border-top: 1px solid var(--line); }
   .empty { color: var(--mut); padding: 10px 0; }
 </style>
 </head>
@@ -49,7 +55,7 @@
 <div class="card">
   <header><b>⚡ Claude energy</b><span><button id="c" title="Open Claude Desktop">✳</button><button id="p" title="Keep on screen (always on top)">📌</button><button id="r" title="Refresh">⟳</button><button id="x" title="Close">✕</button></span></header>
   <div id="list"><div class="empty">Waiting for first reading…</div></div>
-  <footer><span id="upd"></span><span>white tick = where you should be</span></footer>
+  <footer><span id="upd"></span></footer>
 </div>
 <script>
   const $ = (s) => document.querySelector(s);
@@ -63,10 +69,43 @@
     const hue = Math.round(140 - Math.min(1, pct / 90) * 110);
     return `linear-gradient(90deg,hsl(${Math.min(190, hue + 40)} 85% 50%),hsl(${hue} 85% 50%))`;
   }
-  function bar(pct, hot, tick, level) {
-    const t = tick == null ? '' : `<div class="tick" style="left:calc(${Math.min(99.4, tick)}% - 1px)"></div>`;
+  function bar(pct, hot, tick, level, nDays) {
+    let t = tick == null ? '' : `<div class="tick" style="left:calc(${Math.min(99.4, tick)}% - 1px)"></div>`;
+    for (let i = 1; i < (nDays || 0); i++) t = `<div class="dtick" style="left:${(i * 100 / nDays).toFixed(2)}%"></div>` + t;
     return `<div class="track"><div class="fill${pct >= 95 ? ' full' : ''}" style="width:${pct}%;background:${colour(pct, hot, level)}"></div>${t}</div>`;
   }
+  // Labels centred over each segment: 7 days (weekly) or 5 hours (session).
+  function segNames(resetsAt, n, unit) {
+    const start = resetsAt - n * unit, now = Date.now() / 1000;
+    let h = '<div class="dnames">';
+    for (let i = 0; i < n; i++) {
+      const a = start + i * unit, d = new Date((a + unit / 2) * 1000);
+      const cur = now >= a && now < a + unit;
+      const txt = unit >= 86400 ? d.toLocaleDateString([], { weekday: 'short' })
+        : new Date(a * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      h += `<span class="${cur ? 'now' : ''}">${esc(txt)}</span>`;
+    }
+    return h + '</div>';
+  }
+  // Plain lines for the "…" tooltip.
+  function details(m) {
+    const p = m.pace;
+    const out = [`Resets: ${m.resetText}`];
+    if (!p) return m.forecast ? out.concat(m.forecast) : out;
+    const u = p.unit;
+    const hhmm = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    out.push(`Used: ${Math.round(m.pct)}% · should be ≤ ${f1(p.expected)}% now (${p.delta >= 0 ? f1(p.delta) + ' pts over' : f1(-p.delta) + ' pts under'})`);
+    if (p.today !== null) {
+      out.push(`Today: +${f1(p.today)}% of ${f1(p.allowance)}% budget${p.todaySince ? ' (since ' + hhmm(p.todaySince) + ')' : ''}`);
+    }
+    out.push(`Average: ${f1(p.avg)}%/${u} · target ${f1(p.target)}%/${u}`);
+    if (p.budget !== null) {
+      out.push(`Left: ${f1(p.leftPct)}% for ${p.leftText}${u === 'day' && p.leftUnits >= 1 ? ' → ~' + f1(p.budget) + '%/day' : ''}`);
+    }
+    if (m.forecast) out.push(m.forecast);
+    return out;
+  }
+  let last = null;
   function kTok(n) { return n >= 1e6 ? f1(n / 1e6) + 'M' : Math.round(n / 1000) + 'k'; }
 
   function meterBlock(m) {
@@ -75,18 +114,17 @@
     let html = `<div class="m"><div class="row"><span class="name">${esc(m.label)}`;
     if (p) html += `<span class="badge ${p.level}">${p.todayOver ? 'Too much today' : p.warn ? 'Near today\'s limit' : p.hot ? 'Over pace' : 'On pace'}</span>`;
     html += `</span><span class="pct ${p && p.level !== 'ok' ? p.level : ''}">${Math.round(m.pct)}%</span></div>`;
-    html += bar(m.pct, p && p.hot, p ? p.expected : null, p ? p.level : null);
-    html += `<div class="sub">Resets ${esc(m.resetText)}${m.forecast ? ' · ' + esc(m.forecast) : ''}</div>`;
-    if (p) {
-      html += `<div class="pace ${!p.overPace ? 'ok' : p.today !== null ? 'warn' : 'hot'}">Avg ${f1(p.avg)}%/${u} vs target ${f1(p.target)}%/${u} · ${p.delta >= 0 ? '+' : ''}${f1(p.delta)} pts</div>`;
-      if (p.today !== null) {
-        html += `<div class="pace ${p.level}">Today +${f1(p.today)}% · allowed ${f1(p.allowance)}% <span class="sub">(100/7 = ${f1(p.target)}%)</span>`
-          + (p.todaySince ? ` <span class="sub">since ${new Date(p.todaySince * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` : '') + '</div>';
-      }
-      if (p.budget !== null) {
-        const rate = u === 'day' && p.leftUnits >= 1 ? ` (~${f1(p.budget)}%/day)` : '';
-        html += `<div class="pace sub">Left ${f1(p.leftPct)}% for ${esc(p.leftText)}${rate}</div>`;
-      }
+    const segs = p && m.resetsAt ? (p.unit === 'day' ? [7, 86400] : [5, 3600]) : null;
+    if (segs) html += segNames(m.resetsAt, segs[0], segs[1]);
+    html += bar(m.pct, p && p.hot, p ? p.expected : null, p ? p.level : null, segs ? segs[0] : 0);
+    // Compact: one key line. Hover "…" for details (tooltip).
+    const dots = `<span class="more" title="${esc(details(m).join('\n'))}">…</span>`;
+    if (p && p.today !== null) {
+      const rd = m.resetsAt ? new Date(m.resetsAt * 1000).toLocaleDateString([], { day: 'numeric', month: 'short' }) : m.resetText;
+      html += `<div class="sub">Resets ${esc(rd)}</div>`;
+      html += `<div class="pace ${p.level}">Used ${f1(p.today)}% of ${f1(p.allowance)}% budget today${dots}</div>`;
+    } else {
+      html += `<div class="sub">Resets ${esc(m.resetText)}${dots}</div>`;
     }
     return html + '</div>';
   }
@@ -103,7 +141,8 @@
     return html + '</div>';
   }
 
-  window.meter.onData((d) => {
+  window.meter.onData((d) => { last = d; render(d); });
+  function render(d) {
     let html = contextBlock(d.context);
     if (d.needsLogin) html += '<div class="empty">Not signed in — right-click the tray icon → Sign in.</div>';
     else if (!d.meters.length) html += `<div class="empty">${esc(d.error || 'Waiting for first reading…')}</div>`;
@@ -114,7 +153,7 @@
     pin.title = d.pinned ? 'Pinned: always on top, drag the title to move. Click to unpin' : 'Keep on screen (always on top)';
     pin.style.filter = d.pinned ? 'none' : 'grayscale(1) opacity(.55)';
     $('#upd').textContent = d.updated ? 'Updated ' + new Date(d.updated).toLocaleTimeString() : '';
-  });
+  }
   $('#r').onclick = () => window.meter.refresh();
   $('#p').onclick = () => window.meter.pin();
   $('#c').onclick = () => window.meter.openClaude();
