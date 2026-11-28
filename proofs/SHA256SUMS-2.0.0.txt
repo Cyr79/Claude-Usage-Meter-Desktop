@@ -1,0 +1,3 @@
+2d452415796adfbad5fa973b5e8138d2f10e67e3b254ffccb4db9d882ff88627  Claude-Usage-Meter_2.0.0_x64-setup.exe
+ab723d6a5947796920d06136da22f4d5eda3bded8a4860714a8cd769e5b50072  Claude-Usage-Meter_2.0.0_x64-setup.exe.sig
+37e14047b9fedb51c2254fcbf2c4c8a87505a6adf66f1938d1be792df6374728  latest.json
