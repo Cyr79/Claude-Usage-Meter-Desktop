@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "gauge",
+  "description": "Local gauge popup only. The claude.ai sign-in window gets no IPC at all.",
+  "windows": ["gauge"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-start-dragging"
+  ]
+}

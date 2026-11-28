@@ -1,0 +1,44 @@
+[package]
+name = "claude-usage-meter"
+version = "2.0.0"
+edition = "2021"
+description = "Claude.ai usage in the Windows tray"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# No default features we don't use; tray + PNG decoding for the state icons.
+tauri = { version = "2", default-features = false, features = ["wry", "common-controls-v6", "compression", "tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+# preserve_order: same key order as the Electron config.json and same walk order in parse.
+serde_json = { version = "1", features = ["preserve_order"] }
+# rustls (ring), no openssl, no native-tls, no system proxy crate.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "time", "sync", "macros"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tauri-winrt-notification = "0.7"
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Cryptography",
+  "Win32_System_Registry",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_StationsAndDesktops",
+  "Win32_System_SystemInformation",
+  "Win32_Globalization",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

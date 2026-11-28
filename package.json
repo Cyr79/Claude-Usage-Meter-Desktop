@@ -1,27 +1,13 @@
 {
-  "name": "claude-usage-meter",
-  "productName": "Claude Usage Meter",
-  "version": "1.4.1",
-  "description": "Claude.ai usage in your menu bar / system tray",
-  "main": "src/main/index.js",
-  "author": "Cyr79",
-  "homepage": "https://github.com/Cyr79/Claude-Usage-Meter-Desktop",
-  "license": "MIT",
+  "name": "claude-usage-meter-tauri",
+  "private": true,
+  "version": "2.0.0",
   "scripts": {
-    "start": "electron .",
-    "test": "node test/run.js",
-    "pack": "electron-builder --dir",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "release": "electron-builder --mac --win --publish always",
-    "icons": "node tools/make-tray-icons.js"
+    "tauri": "tauri",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "msix": "powershell -ExecutionPolicy Bypass -File packaging/msix/build-msix.ps1"
   },
   "devDependencies": {
-    "electron": "^45.2.3",
-    "electron-builder": "^26.18.0",
-    "sharp": "^0.35.5"
-  },
-  "dependencies": {
-    "electron-updater": "^6.8.11"
+    "@tauri-apps/cli": "^2"
   }
 }

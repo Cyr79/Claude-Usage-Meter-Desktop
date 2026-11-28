@@ -1,249 +1,71 @@
-# Claude Usage Meter — Desktop
+# Claude Usage Meter — Desktop v2.0.0
 
 Your Claude.ai usage limits in the Windows system tray, with a daily pace check
 and a live context meter for Claude Code.
+GitHub: [Cyr79/Claude-Usage-Meter-Desktop](https://github.com/Cyr79/Claude-Usage-Meter-Desktop)
 
-> **Windows only.** Releases ship a Windows installer (x64 / arm64). The code
-> still runs on macOS (menu bar text), but no macOS build is published or tested:
-> build it yourself with `npm run dist:mac` on a Mac.
+> **Windows only.**
 
-```
-Windows   numbered tray badges · hover for pace · click for the energy gauge
-macOS     S: 42%  W: 18%  F: 7%   (menu bar text, build from source only)
-```
+## What's new in 2.0.0
 
-<p>
-  <img src="docs/energy-gauge-1.4.1.png" width="306" alt="Energy gauge 1.4.1: weekly bar split by usage and budget, hover tooltip">
-  &nbsp;
-  <img src="docs/tray-tooltip.png" width="300" alt="Tray badges and Fable pace tooltip">
-</p>
+- **Rewritten with Tauri (Rust + system WebView2)** instead of Electron. Same features, a fraction of the size and memory.
+- **Per-day Weekly segments:** the Weekly bar is split by day (past days as wide as what they used, today as wide as today's budget, the rest shared over the coming days).
+- **Adaptive polling:** slower when you are idle or the session is locked, backs off on errors and rate limits, wakes just after a reset.
+- **No webview when idle:** the gauge window is destroyed when it closes, so the tray app runs with no WebView2 process at all. A browser window exists only while the gauge or the sign-in page is open.
 
-<sub>Left: the energy gauge, pinned, on Windows 11 (v1.4.1), hovering today's part of the Weekly bar. Right: tray badges
-(Fable 16, Weekly 77, Session 64) and the pace tooltip of the Fable badge.</sub>
+## Resources
+
+Windows, app idle in the tray, gauge closed, signed in. Same machine for both rows.
+
+| | Electron 1.4.1 | Tauri 2.0.0 |
+|---|---|---|
+| Processes | 4 | **1** |
+| Private memory | 234 MB | **7 MB** |
+| Working set | 322 MB | **71 MB** |
+| CPU (idle) | 0.003 % | 0.002 % |
+| Installer | 226 MB | **2 MB** |
+
+Idle CPU is equal for both (no CPU advantage claimed). Tauri with the gauge popup open: about 107 MB (measured by Claude Code); it is all released when the popup closes.
+
+**Method:** `meas.ps1` (PowerShell, Windows) sums the whole process tree of the app, including its `msedgewebview2.exe` children, 30 s after start, then averages CPU over 60 s (`meas.ps1 -sec 60`).
+The Tauri installer needs the Microsoft WebView2 runtime (already present on Windows 11; the installer fetches it if missing).
 
 ## Features
 
-### Usage badges
-One badge per limit (Session 5h, Weekly, Weekly Opus, Fable) showing the
-percentage used. Colour = state: normal, amber from 80%, red from 95%, grey
-when the reading is stale. Display → *Taskbar badges* switches to a single badge
-for the meter closest to its limit.
-
-### ⚡ Energy gauge (new in 1.1)
-**Left-click** any badge for a popup with one bar per meter. Bars fill
-green → amber → red and pulse near the limit. The **white tick** is where you
-*should* be if usage were spread evenly over the window: bar past the tick =
-ahead of pace. **Right-click** opens the menu.
-
-**📌 Pin it** (new in 1.2.0): click the pin in the gauge title, or menu →
-*Keep gauge on screen*. The gauge then stays always on top, doesn't close when
-you click elsewhere, can be dragged by its title anywhere, and comes back at the
-same spot when the app starts. Click 📌 again or ✕ to unpin.
-
-### 🗓️ Day and hour markers, compact gauge (new in 1.4, updated in 1.4.1)
-- **Weekly bar split by usage (1.4.1):** each past day is as wide as what it
-  really used, today is as wide as today's budget (between two white marks),
-  and what is left is shared evenly over the coming days. Use less today and
-  the next days grow. Past usage is shaded darker. Days with no reading yet
-  merge into the next one (e.g. `mer.+jeu.`); the day log starts when you
-  install 1.4.1.
-- **Hover a part of the Weekly bar:** `ven.: 15.0% used of 16.3% budget`
-  (today), `mer.+jeu.: 24.0% of the week used` (past), `sam.: 14.9% budget`
-  (coming). Native tooltips, no mouse handlers: no CPU while the gauge is open.
-- **Session colours are wider:** green up to +10 pts ahead of pace, orange
-  ("Ahead of pace") up to +20, red above. One prompt can jump several %.
-- **Session bar** split in 5 parts, one per hour, with the start time of each
-  hour above it.
-- **One line per limit:** Session shows `Resets in 4h 34m`; Weekly shows
-  `Resets 2 déc.` and `Used 9.0% of 16.3% budget today`.
-- **Hover `…`** for the details: reset time, used vs where you should be,
-  today's budget, average vs target, what is left per day.
-- **Smaller window** (270 px wide) that fits its content, with no empty space.
-
-The daily **budget** is a fair share, not a hard limit: (100% − used) ÷ days
-left. Go over it one day and the next days get a smaller budget.
-
-### ✳ Open Claude Desktop, About, Fable (new in 1.3)
-- **Open Claude Desktop:** right-click a badge → *Open Claude Desktop*, or the
-  ✳ button in the gauge title. Falls back to claude.ai in the browser when the
-  desktop app isn't installed.
-- **About:** right-click → *About Claude Usage Meter…* shows the version, this
-  repo, the credit to the original project and a privacy note.
-- **Fable limit:** Claude now reports model-scoped limits in a new `limits[]`
-  list; the Fable gauge and badge are read from there. Limits Claude doesn't
-  report separately for your account are greyed out in Display.
-- **Security:** Electron 32 → 45 (the old one had known vulnerabilities), and
-  the organization id returned by claude.ai is validated before use.
-
-### 🪶 Light on resources (new in 1.2.1)
-Usage is read straight from Claude's API through Electron's own network stack,
-using the saved sign-in. Earlier versions kept a hidden claude.ai page open
-just to stay signed in; that page is gone. A browser window opens only for
-sign-in, and as an automatic fallback for 30 min if claude.ai's bot check ever
-blocks the direct request. The gauge window is freed when closed (kept only
-while pinned).
-
-Measured on Windows 11, 16 cores, app idle in the tray:
-
-| | 1.1.1 | 1.2.1 |
-|---|---|---|
-| Processes | 6 | 3 |
-| RAM (Task Manager) | 995 MB | **217 MB** |
-| RAM used by the app alone | 498 MB | 251 MB |
-| CPU | 0.55% of one core | 0.16% of one core |
-
-Opening the gauge adds about 90 MB, freed again when it closes. On 1.3
-(Electron 45) the idle figure is about 280 MB.
-
-### 🕛 Reset time (new in 1.2.2)
-A reset at midnight is shown as **23:59 of the last day you can still use**,
-with the day name, e.g. `resets Tue 10 Nov 23:59`, instead of
-`Wed 00:00` or "tonight".
-
-### 📅 Daily pace (new in 1.1)
-A weekly limit allows **100% / 7 days = 14.3% per day**. Hover the Weekly badge:
-
-```
-Weekly — 90%, resets tis 3 nov. 23:59
-🟢 Avg 13.3%/d · target 14.3
-🟢 Today +1.0% (max 11.0)
-Left 10.0% · 5h 16m
-```
-
-| Line | Meaning |
-|---|---|
-| **Avg** | average use per day since the week started, vs the 14.3%/day target |
-| **Today** | used since midnight, vs the most you can spend today and still last until the reset |
-| **Left** | what remains and the time until reset; with more than a day left it adds the %/day you can afford, e.g. `(17.1%/d)` |
-
-Weekly colours follow **Today** only, because today's allowance is already
-recalculated from what is left (past overspend is priced in):
-
-| Today vs allowance | Bar, badge, tray |
-|---|---|
-| under 70% | 🟢 green · *On pace* |
-| 70–100% | 🟠 orange · *Near today's limit* |
-| over 100% | 🔴 red · *Too much today* |
-
-The **Avg** line is informational: orange when the week is ahead of pace, it
-does not change the colour. Not using Claude brings it back down by itself.
-Toggle: Display → *Red badge when over daily pace*. The 5-hour Session meter
-uses the pace model per hour (100% / 5h = 20%/h) and turns red when over pace.
-
-"Today" starts at the first reading of the day, so on the day you install it
-only counts from that moment.
-
-### 🧠 Claude Code context window (new in 1.1)
-A teal badge shows how full the context window of your **active Claude
-Code session** is: tokens in context / 200k (1M once a session goes past 200k).
-It reads the transcripts Claude Code saves in `~/.claude/projects` every 5 s and
-moves after each reply; `/compact` or `/clear` bring it back down. It hides after
-30 min without activity; the gauge keeps the last value marked *idle*.
-
-| Works | Doesn't work |
-|---|---|
-| Claude Code on this PC: terminal, VS Code / JetBrains, desktop app Code tab | claude.ai and Claude Desktop chats (no context size is exposed anywhere) |
-| | Claude Code sessions running in the cloud |
-
-Display → *Claude Code context gauge* toggles it; *Context window size* forces
-200k or 1M.
+- **Usage badges:** one tray badge per limit (Session 5h, Weekly, Weekly Opus, Fable). Amber from 80%, red from 95%, grey when stale.
+- **Energy gauge:** left-click a badge. White tick = where you should be if usage were spread evenly. Pin it to keep it on screen.
+- **Daily pace:** hover a badge for average per day, today's allowance and time left.
+- **Claude Code context:** live context-window meter.
+- **Menu:** right-click a badge (display options, open Claude Desktop, About, Quit).
 
 ## Install
 
-1. Download `Claude Usage Meter Setup x.y.z.exe` from
-   [Releases](https://github.com/Cyr79/Claude-Usage-Meter-Desktop/releases).
-2. Quit the running meter (right-click a badge → Quit).
-3. Run the installer. The `.exe` has no Authenticode code-signing certificate,
-   so SmartScreen may warn: *More info → Run anyway*. Settings and sign-in are
-   kept.
-4. Optional, check the file: compare `Get-FileHash <file> -Algorithm SHA256`
-   with `SHA256SUMS.txt` in the release. That list is timestamped on Bitcoin
-   (`SHA256SUMS.txt.ots`, OpenTimestamps), and commits and tags are signed.
-5. Sign in once when the window opens. It then hides and polls in the background.
+1. Download `Claude-Usage-Meter_2.0.0_x64-setup.exe` from [Releases](https://github.com/Cyr79/Claude-Usage-Meter-Desktop/releases).
+> **Electron users:** v2.0.0 must be installed manually once. The old Electron updater will not migrate you; from 2.0.0 on, updates are automatic.
 
-Badges hidden? Click the **^** arrow next to the clock and drag them onto the taskbar.
+2. Quit the running meter (right-click a badge → Quit) and run the installer (per-user, no admin). Settings and sign-in are kept.
+3. Sign in once when the window opens; it closes by itself and the meter polls in the background.
 
-## Run from source
-
-```bash
-npm install
-npm start
-```
+**SmartScreen:** the installer is not code-signed, so Windows may warn (*More info → Run anyway*). A Microsoft Store (MSIX) release is planned; it will be signed by Microsoft.
 
 ## Build
 
-```bash
-npm test          # 24 tests: parse, forecast, pace, context
-npm run dist:win  # NSIS installer
-npm run dist:mac  # DMG (arm64 + x64)
 ```
-
-On Windows without Developer Mode, electron-builder can fail extracting
-`winCodeSign` ("Cannot create symbolic link"). Extract the downloaded `.7z` in
-`%LOCALAPPDATA%\electron-builder\Cache\winCodeSign` into a `winCodeSign-2.6.0`
-folder once (the two macOS symlink errors are harmless) and rebuild.
-
-### Signing secrets
-Optional — unset means unsigned builds with OS warnings.
-
-| Secret | Purpose |
-|---|---|
-| `MAC_CERT_P12`, `MAC_CERT_PASSWORD` | Developer ID cert, base64-encoded |
-| `APPLE_ID`, `APPLE_APP_PASSWORD`, `APPLE_TEAM_ID` | Notarization |
-| `WIN_CERT_PFX`, `WIN_CERT_PASSWORD` | Windows code signing |
-
-## Architecture
-
+npm install
+npm run tauri build      # NSIS installer in src-tauri/target/release/bundle/nsis
+cargo test               # in src-tauri
 ```
-src/main/index.js     tray, menu, polling, energy gauge window, auto-launch
-src/main/fetcher.js   direct /api fetch via the persist:claude session (window only for sign-in / fallback)
-src/main/parse.js     tolerant tree-walk over the /usage payload
-src/main/forecast.js  reset detection + burn-rate regression
-src/main/pace.js      daily pace vs 100%/window, today's allowance
-src/main/context.js   Claude Code context fill from ~/.claude/projects
-src/main/format.js    mac title text / windows icon state + tooltip
-src/main/trayicon.js  badge bitmaps drawn by hand (no canvas, no native deps)
-src/main/store.js     JSON config in userData
-src/renderer/         energy gauge popup (gauge.html + preload)
-```
-
-No Playwright: Electron already ships Chromium, so a hidden `BrowserWindow`
-with a `persist:claude` partition is the browser, and the fetch runs inside the
-page with real cookies, headers and origin.
-
-### Why Windows and macOS differ
-macOS lets an app draw text in the menu bar. A Windows tray entry is a 16 px
-image plus a tooltip (max 127 characters), so each meter gets its own badge with
-the number drawn into it, and the details live in the tooltip and the gauge.
-
-### Details worth knowing
-- **pickPct rule.** REST `utilization` is 0..100 (`1` means 1%); SSE
-  `message_limit` values are 0..1. `parse.js` never rescales.
-- **Reset detection.** `resets_at` creeps forward a few seconds every poll, so a
-  reset is only a ≥30 min jump or a drop to ≤40%.
-- **User-Agent.** Electron's default UA trips the bot filter (403 on `/api/*`);
-  `fetcher.js` strips it.
-- **Auth state.** Only a real 401/403 means "signed out"; other failures show an error.
 
 ## Credits and privacy
-Fork of [Claude Usage Meter](https://github.com/SelectorsHub/Claude-Usage-Meter-Desktop)
-by SelectorsHub (MIT). Independent project, not affiliated with Anthropic.
-The app talks only to claude.ai with your own sign-in and to GitHub for
-updates; your login stays on your PC.
+
+Fork of [Claude Usage Meter](https://github.com/SelectorsHub/Claude-Usage-Meter-Desktop) by SelectorsHub (MIT). Independent project, not affiliated with Anthropic.
+The app talks only to claude.ai with your own sign-in and to GitHub for updates. Your login is stored on your PC (Windows DPAPI) and never sent anywhere else.
 
 ## Known limits
-- **Free plans don't work:** `/usage` returns nothing for unmetered accounts.
-- **Context meter is Claude Code only** (see above).
-- **~150 MB installed** — that's Chromium.
 
-## Changelog
-- **1.4.1** — Weekly bar split by usage (past days = real use, today = budget, rest shared), hover tooltips per part, per-day log, wider Session colour band (orange +10, red +20 pts), day names follow the Windows display language.
-- **1.4.0** — Weekly bar split in 7 days and Session bar in 5 hours, with labels; compact gauge (one line per limit, details in a `…` tooltip); "budget" wording; window fits its content; gauge no longer invisible on some PCs (solid background) and no longer closes right after opening from the tray.
-- **1.3.1** — Weekly colour follows today vs allowance (orange from 70%, red over), Avg line informational; lighter polling (context file cached, tray badge redrawn only on change, resets_at jitter ignored).
-- **1.3.0** — Open Claude Desktop shortcut, About dialog, Fable limit detected, Electron 45, greyed-out unreported limits.
-- **1.2.2** — Midnight resets shown as 23:59 of the last day, with the day name.
-- **1.2.1** — Lighter: usage is read straight from the API (no hidden claude.ai page; window only for sign-in or as fallback), closed gauge is freed.
-- **1.2.0** — 📌 Pin the energy gauge: always on top, draggable, remembered position.
-- **1.1.1** — "Left 10% · 5h 16m" replaces the confusing %/day figure when less than a day remains.
-- **1.1.0** — Energy gauge popup, daily pace vs 100%/7 with red badges, Claude Code context meter.
-- **1.0.3** — Weekly reset shown as date and time; larger Windows badges.
+- Free plans don't work: `/usage` returns nothing for unmetered accounts.
+- The context meter covers Claude Code only.
+
+## License
+
+MIT, as the upstream project.
