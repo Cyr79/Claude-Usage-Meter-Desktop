@@ -2,7 +2,7 @@
 
 /**
  * Weekly bar split by usage, not time:
- * past day = what it really used, today = today's budget,
+ * each past day = what it really used, today = today's budget,
  * future days = what is left, shared evenly.
  * The day log keeps each local day's last pct for this window.
  */
@@ -51,17 +51,14 @@ function weekSegments(meter, p, log, now = Date.now() / 1000) {
   const b = Math.max(0, meter.pct - p.today);           // used before today
   const valid = log && Math.abs(meter.resetsAt - log.resetsAt) < 1800;
   const segs = [];
-  // Past days: a day with no reading merges into the next one.
+  // One segment per past day; a day with no reading is a 0-width noData segment.
   let from = 0;
-  let names = [];
   for (let i = 0; i < t; i++) {
-    names.push(days[i].ts);
-    const end = i === t - 1 ? b : valid ? log.days[days[i].key] : undefined;
-    if (end === undefined) continue;
-    const to = Math.min(b, Math.max(from, end));
-    segs.push({ days: names, from, to, kind: 'past' });
+    const last = i === t - 1;
+    const end = last ? b : valid ? log.days[days[i].key] : undefined;
+    const to = end === undefined ? from : Math.min(b, Math.max(from, end));
+    segs.push({ days: [days[i].ts], from, to, kind: 'past', noData: end === undefined });
     from = to;
-    names = [];
   }
   const budgetEnd = Math.min(100, b + p.allowance);
   segs.push({ days: [days[t].ts], from: b, to: budgetEnd, kind: 'today' });

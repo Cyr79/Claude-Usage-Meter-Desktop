@@ -43,6 +43,8 @@
   .hseg { position: absolute; top: 0; bottom: 0; z-index: 2; }
   .hseg:hover { background: rgba(255,255,255,.12); }
   .dtick.now { background: rgba(255,255,255,.75); }
+  .hseg.alt { background: rgba(255,255,255,.10); }
+  .hseg.past { box-shadow: inset -1px 0 0 rgba(0,0,0,.55); }
   .dtick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,.22); }
   @keyframes alarm { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
   .sub { color: var(--mut); margin-top: 3px; }
@@ -97,8 +99,9 @@
   // Weekly split by usage: past days = real use, today = budget, rest shared.
   // Day names in the gauge's locale (same as the Session hours).
   const segLabel = (s) => s.days.map((ts) => new Date(ts * 1000).toLocaleDateString([], { weekday: 'short' })).join('+');
+  const segDate = (s) => new Date(s.days[0] * 1000).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   function usageNames(segs) {
-    return '<div class="snames">' + segs.map((s) => s.to - s.from < 7 ? ''
+    return '<div class="snames">' + segs.map((s) => s.to - s.from < 4 ? ''
       : `<span class="${s.kind === 'today' ? 'now' : ''}" style="left:${((s.from + s.to) / 2).toFixed(2)}%">${esc(segLabel(s))}</span>`).join('') + '</div>';
   }
   function usageBar(m) {
@@ -110,12 +113,14 @@
       t += `<div class="dtick${now ? ' now' : ''}" style="left:${Math.min(99.6, s.from).toFixed(2)}%"></div>`;
     }
     // Hover zones: native tooltips, no mouse handlers (no CPU while idle).
+    let pi = 0;
     for (const s of m.segs) {
       const w = s.to - s.from;
-      const tip = s.kind === 'past' ? `${segLabel(s)}: ${f1(w)}% of the week used`
+      const cls = s.kind === 'past' ? ' past' + (pi++ % 2 ? ' alt' : '') : '';
+      const tip = s.kind === 'past' ? `${segDate(s)}: ${s.noData ? 'no data' : f1(w) + '% of the week used'}`
         : s.kind === 'today' ? `${segLabel(s)}: ${f1(Math.max(0, m.pct - s.from))}% used of ${f1(w)}% budget`
         : `${segLabel(s)}: ${f1(w)}% budget`;
-      t += `<div class="hseg" style="left:${s.from.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(tip)}"></div>`;
+      t += `<div class="hseg${cls}" style="left:${s.from.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(tip)}"></div>`;
     }
     return `<div class="track"><div class="fill${m.pct >= 95 ? ' full' : ''}" style="width:${m.pct}%;background:${colour(m.pct, p.hot, p.level)}"></div>${t}</div>`;
   }
